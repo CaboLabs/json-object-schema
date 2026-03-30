@@ -1,0 +1,73 @@
+{
+  "$oojs": "1.0",
+  "$id": "https://example.org/schemas/clinical",
+  "title": "Clinical Entries",
+  "description": "Example OOJS schema modeling a clinical domain with inheritance and polymorphism.",
+  "discriminator": "_type",
+  "types": {
+    "ClinicalEntry": {
+      "abstract": true,
+      "title": "Clinical Entry",
+      "description": "Abstract base type for all clinical entries.",
+      "properties": {
+        "id":        { "type": "string", "minLength": 1, "description": "Unique identifier" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the entry was recorded" },
+        "subjectId": { "type": "string", "description": "Patient identifier" }
+      },
+      "required": ["id", "timestamp", "subjectId"]
+    },
+
+    "Observation": {
+      "extends": "ClinicalEntry",
+      "title": "Observation",
+      "description": "A measured clinical observation (e.g. vital sign, lab result).",
+      "properties": {
+        "code":  { "type": "string", "description": "LOINC or SNOMED code" },
+        "value": { "type": "number" },
+        "unit":  { "type": "string", "description": "UCUM unit code" }
+      },
+      "required": ["code", "value"]
+    },
+
+    "Diagnosis": {
+      "extends": "ClinicalEntry",
+      "title": "Diagnosis",
+      "description": "A clinical diagnosis coded with ICD-10.",
+      "properties": {
+        "icdCode":     { "type": "string", "pattern": "^[A-Z][0-9]{2}(\\.[0-9]{1,4})?$" },
+        "description": { "type": "string" },
+        "certainty":   { "type": "string", "enum": ["confirmed", "probable", "possible"] }
+      },
+      "required": ["icdCode", "certainty"]
+    },
+
+    "Procedure": {
+      "extends": "ClinicalEntry",
+      "title": "Procedure",
+      "description": "A clinical procedure performed on a patient.",
+      "properties": {
+        "code":        { "type": "string", "description": "Procedure code (CPT or SNOMED)" },
+        "description": { "type": "string" },
+        "outcome":     { "type": "string", "enum": ["successful", "unsuccessful", "partial"] }
+      },
+      "required": ["code"]
+    },
+
+    "Encounter": {
+      "title": "Encounter",
+      "description": "A clinical encounter containing multiple entries.",
+      "properties": {
+        "id":        { "type": "string", "minLength": 1 },
+        "patientId": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime":   { "type": "string", "format": "date-time" },
+        "findings":  {
+          "type": "array",
+          "items": { "type": "ClinicalEntry" },
+          "description": "Polymorphic list: any ClinicalEntry subtype is accepted"
+        }
+      },
+      "required": ["id", "patientId"]
+    }
+  }
+}
