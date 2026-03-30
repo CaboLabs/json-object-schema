@@ -1,0 +1,1 @@
+{ "name": "json-object-schema", "version": "1.0.0", "description": "Node.js implementation of JSON Object Schema validator", "main": "index.js", "scripts": { "test": "mocha" }, "keywords": ["json", "schema", "validation"], "author": "", "license": "Apache-2.0" }
