@@ -29,6 +29,7 @@ This document specifies the Object-Oriented JSON Schema (OOJS) language, version
    - 8.10 [Choosing Between Vertical and Horizontal](#810-choosing-between-vertical-and-horizontal)
    - 8.11 [Unidirectional and Bidirectional Relationships](#811-unidirectional-and-bidirectional-relationships)
    - 8.12 [Graph Document Format](#812-graph-document-format)
+   - 8.13 [Cycles in the Object Model](#813-cycles-in-the-object-model)
 9. [Validation](#9-validation)
 10. [Schema Registry and Imports](#10-schema-registry-and-imports)
 11. [Naming Rules](#11-naming-rules)
@@ -935,6 +936,81 @@ Use standalone instances (with bare ID strings) when:
 - Objects are retrieved and validated independently (API pagination, lazy loading).
 - The associated objects live in a separate data store.
 - Graph completeness at document level is not required.
+
+---
+
+### 8.13 Cycles in the Object Model
+
+A **cycle** (also called a loop or circular reference) occurs when a chain of relationships leads back to a type or object that already appeared in the chain. OOJS explicitly permits cycles at both the schema level and the instance level.
+
+#### 8.13.1 Cycles in the Schema (Class Model)
+
+A cycle in the schema arises when the type-reference chain contains a type that references itself, directly or indirectly:
+
+- **Self-referential**: `Employee.manager` is a TypeRef to `Employee`. An employee can have a manager who is also an employee.
+- **Two-type cycle**: `Employee.department` is a TypeRef to `Department`, and `Department.head` is a TypeRef to `Employee`. Each type references the other.
+- **N-type cycle**: `A.b` → `B`, `B.c` → `C`, `C.a` → `A`. The chain closes after N hops.
+
+These are all valid OOJS schemas. A schema parser processes only the type *names* (strings) when loading type definitions; it never expands a TypeRef recursively during loading. As a result schema loading always terminates regardless of how many cycles the type graph contains.
+
+```json
+"Employee": {
+  "properties": {
+    "employeeId": { "type": "string" },
+    "name":       { "type": "string" },
+    "manager":    { "type": "Employee" }
+  },
+  "required": ["employeeId", "name"]
+},
+"Department": {
+  "properties": {
+    "departmentId": { "type": "string" },
+    "name":         { "type": "string" },
+    "head":         { "type": "Employee" }
+  },
+  "required": ["departmentId", "name"]
+}
+```
+
+The `Employee ↔ Department` cycle above is perfectly valid. Both types load without error; the TypeRef strings are resolved only at validation time.
+
+#### 8.13.2 Cycles in Graph Document Instances
+
+In a graph document (§8.12), objects are connected by `$ref-id` references. Those references can form cycles in the instance data as well:
+
+```json
+{
+  "$oojs": "1.0",
+  "roots": [
+    {
+      "$type": "Employee",
+      "$id":   "emp-alice",
+      "employeeId": "E-001",
+      "name":  "Alice",
+      "manager": { "$ref-id": "emp-bob" }
+    }
+  ],
+  "objects": {
+    "emp-bob": {
+      "$type": "Employee",
+      "$id":   "emp-bob",
+      "employeeId": "E-002",
+      "name":  "Bob",
+      "manager": { "$ref-id": "emp-alice" }
+    }
+  }
+}
+```
+
+Here Alice's manager is Bob and Bob's manager is Alice — a two-node cycle. Longer cycles (A → B → C → A) are equally valid.
+
+OOJS validators MUST handle cycles in graph document instances without entering an infinite loop. The standard technique is to maintain a **visited set** of `$id` values during Pass 2 of graph document validation (§8.12.5): when a `$ref-id` target is encountered whose `$id` is already in the visited set for the current traversal path, the validator skips re-validating that object (it has already been validated or is currently being validated) and continues without error. This ensures validation terminates in O(N) time where N is the number of objects in the graph, regardless of cycle depth or count.
+
+> **Note**: cycles are only possible in horizontal relationships (§8.9) and graph documents. Vertical (embedded) relationships cannot form cycles because JSON itself cannot represent a value that contains itself; the object tree is always a DAG.
+
+#### 8.13.3 Cycles in Standalone Instances
+
+In standalone instances that use bare ID strings for horizontal references (§8.9), no object traversal occurs during validation — the validator checks only that the ID property is a string of the correct type. Cycles therefore have no special meaning and require no special handling: each instance is validated independently without following any references.
 
 ---
 
