@@ -1,0 +1,89 @@
+{
+  "_comment": "Valid and invalid instances for fleet.oojs.json — horizontal (reference-by-ID) relationships",
+
+  "valid": [
+    {
+      "_comment": "Person with has-many horizontal: owns two cars (by ID)",
+      "_type":    "Person",
+      "personId": "person-001",
+      "name":     "Alice Smith",
+      "email":    "alice@example.org",
+      "carIds":   ["car-001", "car-002"]
+    },
+    {
+      "_comment": "Person with no cars (empty has-many horizontal is valid by default)",
+      "_type":    "Person",
+      "personId": "person-002",
+      "name":     "Bob Jones"
+    },
+    {
+      "_comment": "Car with has-one horizontal owner, and optional has-one horizontal garage",
+      "_type":    "Car",
+      "carId":    "car-001",
+      "make":     "Acme",
+      "model":    "Roadster",
+      "year":     2024,
+      "ownerId":  "person-001",
+      "garageId": "garage-001"
+    },
+    {
+      "_comment": "Car with has-one horizontal owner only; no garage (optional field absent)",
+      "_type":   "Car",
+      "carId":   "car-002",
+      "make":    "ZipCar",
+      "model":   "Nano",
+      "ownerId": "person-001"
+    },
+    {
+      "_comment": "Garage with has-many horizontal: stores two cars (by ID)",
+      "_type":    "Garage",
+      "garageId": "garage-001",
+      "name":     "Downtown Parking",
+      "capacity": 50,
+      "carIds":   ["car-001", "car-003"]
+    },
+    {
+      "_comment": "Fleet with has-one horizontal operator + has-many horizontal cars and persons",
+      "_type":     "Fleet",
+      "fleetId":   "fleet-001",
+      "name":      "City Commuter Fleet",
+      "operatorId": "person-002",
+      "carIds":    ["car-001", "car-002"],
+      "personIds": ["person-001", "person-002"]
+    },
+    {
+      "_comment": "Minimal Fleet — only required fields; no cars or persons assigned yet",
+      "_type":   "Fleet",
+      "fleetId": "fleet-002",
+      "name":    "Reserve Fleet"
+    }
+  ],
+
+  "invalid": [
+    {
+      "_comment": "ERROR: Car missing required has-one horizontal ownerId",
+      "_type":  "Car",
+      "carId":  "car-bad-001",
+      "make":   "Acme",
+      "model":  "Orphan"
+    },
+    {
+      "_comment": "ERROR: Person missing required personId",
+      "_type": "Person",
+      "name":  "No ID"
+    },
+    {
+      "_comment": "ERROR: Fleet missing required name",
+      "_type":   "Fleet",
+      "fleetId": "fleet-bad-001"
+    },
+    {
+      "_comment": "ERROR: Car ownerId must be a string — an integer is not a valid ID value",
+      "_type":   "Car",
+      "carId":   "car-bad-002",
+      "make":    "Acme",
+      "model":   "TypeWrong",
+      "ownerId": 12345
+    }
+  ]
+}

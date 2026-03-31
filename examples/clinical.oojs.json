@@ -2,13 +2,13 @@
   "$oojs": "1.0",
   "$id": "https://example.org/schemas/clinical",
   "title": "Clinical Entries",
-  "description": "Example OOJS schema modeling a clinical domain with inheritance and polymorphism.",
+  "description": "Example OOJS schema modeling a clinical domain with inheritance and polymorphism. Demonstrates vertical (hierarchical/embedded) has-many relationships: an Encounter owns and embeds its ClinicalEntry findings directly in the JSON.",
   "discriminator": "_type",
   "types": {
     "ClinicalEntry": {
       "abstract": true,
       "title": "Clinical Entry",
-      "description": "Abstract base type for all clinical entries.",
+      "description": "Abstract base type for all clinical entries. Cannot be instantiated directly — use Observation, Diagnosis, or Procedure.",
       "properties": {
         "id":        { "type": "string", "minLength": 1, "description": "Unique identifier" },
         "timestamp": { "type": "string", "format": "date-time", "description": "When the entry was recorded" },
@@ -55,7 +55,7 @@
 
     "Encounter": {
       "title": "Encounter",
-      "description": "A clinical encounter containing multiple entries.",
+      "description": "A clinical encounter containing multiple entries. The 'findings' property is a HAS-MANY VERTICAL (polymorphic) relationship: ClinicalEntry subtypes are embedded directly inside the Encounter JSON and fully validated as part of it. The Encounter owns its findings.",
       "properties": {
         "id":        { "type": "string", "minLength": 1 },
         "patientId": { "type": "string" },
@@ -64,7 +64,7 @@
         "findings":  {
           "type": "array",
           "items": { "type": "ClinicalEntry" },
-          "description": "Polymorphic list: any ClinicalEntry subtype is accepted"
+          "description": "HAS-MANY VERTICAL (polymorphic): any concrete ClinicalEntry subtype is accepted. Each item is embedded in the Encounter JSON and validated independently via discriminator dispatch."
         }
       },
       "required": ["id", "patientId"]

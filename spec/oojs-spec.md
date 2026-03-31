@@ -22,6 +22,11 @@ This document specifies the Object-Oriented JSON Schema (OOJS) language, version
 6. [Property Definitions](#6-property-definitions)
 7. [Discriminator](#7-discriminator)
 8. [Instance Model](#8-instance-model)
+   - 8.6 [Object Relationships](#86-object-relationships)
+   - 8.7 [Has-One and Has-Many](#87-has-one-and-has-many)
+   - 8.8 [Vertical Relationships (Hierarchical / Embedded)](#88-vertical-relationships-hierarchical--embedded)
+   - 8.9 [Horizontal Relationships (Non-Hierarchical / Reference by ID)](#89-horizontal-relationships-non-hierarchical--reference-by-id)
+   - 8.10 [Choosing Between Vertical and Horizontal](#810-choosing-between-vertical-and-horizontal)
 9. [Validation](#9-validation)
 10. [Schema Registry and Imports](#10-schema-registry-and-imports)
 11. [Naming Rules](#11-naming-rules)
@@ -423,6 +428,198 @@ By default, OOJS operates in closed-world mode: a property present in the instan
 ### 8.5 Open-World Mode
 
 A schema MAY declare `"additionalProperties": true` at the schema level (not on individual types) to enable open-world mode. In open-world mode, unknown properties are silently ignored.
+
+---
+
+### 8.6 Object Relationships
+
+OOJS types can be associated with one another in ways that go beyond inheritance. A **relationship** is a runtime connection between instances of two types. Relationships are expressed through property definitions (§6) and fall along two independent axes:
+
+- **Cardinality**: how many instances of the associated type are involved (has-one or has-many).
+- **Structure**: whether the associated instance is embedded inside the owning instance (vertical) or referenced by identifier from a separate location (horizontal).
+
+These axes are orthogonal: any combination of cardinality and structure is valid.
+
+The type hierarchy (§3.4) describes what a type *is*. Relationships describe what a type *has*. The two concepts are independent: a `Dog` IS-A `Animal` (inheritance); an `Encounter` HAS-MANY `ClinicalEntry` values (relationship).
+
+---
+
+### 8.7 Has-One and Has-Many
+
+**Has-one** — the owning type holds a reference to exactly one instance of the associated type (or a concrete subtype thereof). In OOJS, has-one is expressed as a type reference property (§6.2) or a string property holding an ID (§8.9).
+
+**Has-many** — the owning type holds zero or more instances of the associated type. In OOJS, has-many is expressed as an array property (§6.3) whose `items` is either a type reference (for embedded objects) or a primitive string type (for ID references).
+
+The `minItems` and `maxItems` constraints on an array property (§6.3) allow a schema author to further restrict cardinality — for example, `"minItems": 1` expresses a "has-one-or-more" constraint, and equal `minItems` and `maxItems` express an exact count.
+
+| Cardinality | OOJS representation |
+|-------------|---------------------|
+| Has-one (vertical) | TypeRefProperty with `"type": "TypeName"` |
+| Has-many (vertical) | ArrayProperty with `"items": {"type": "TypeName"}` |
+| Has-one (horizontal) | PrimitiveProperty with `"type": "string"` holding an ID |
+| Has-many (horizontal) | ArrayProperty with `"items": {"type": "string"}` holding IDs |
+
+---
+
+### 8.8 Vertical Relationships (Hierarchical / Embedded)
+
+A **vertical relationship** (also called *hierarchical* or *composition*) embeds the associated object directly inside the owning object's JSON representation. The owned object:
+
+- carries its own discriminator property and is fully validated by the OOJS validator as part of its owner's validation;
+- exists only within the scope of its owner's JSON document;
+- has no independent identity outside that document.
+
+**Has-one vertical** — expressed as a TypeRefProperty (§6.2):
+
+```json
+"Motor": {
+  "properties": {
+    "horsepower": { "type": "number", "minimum": 1 },
+    "cylinders":  { "type": "integer", "minimum": 1 }
+  },
+  "required": ["horsepower", "cylinders"]
+},
+"Car": {
+  "properties": {
+    "make":  { "type": "string" },
+    "model": { "type": "string" },
+    "motor": { "type": "Motor" }
+  },
+  "required": ["make", "model", "motor"]
+}
+```
+
+A valid `Car` instance embeds the `Motor` object directly:
+
+```json
+{
+  "_type": "Car",
+  "make":  "Acme",
+  "model": "Roadster",
+  "motor": { "_type": "Motor", "horsepower": 220, "cylinders": 4 }
+}
+```
+
+**Has-many vertical (polymorphic)** — expressed as an ArrayProperty (§6.3) whose item type is abstract, accepting any concrete subtype:
+
+```json
+"Encounter": {
+  "properties": {
+    "id":       { "type": "string" },
+    "findings": {
+      "type":  "array",
+      "items": { "type": "ClinicalEntry" }
+    }
+  },
+  "required": ["id"]
+}
+```
+
+A valid `Encounter` instance embeds mixed-type `ClinicalEntry` subtypes inline:
+
+```json
+{
+  "_type": "Encounter",
+  "id":    "enc-001",
+  "findings": [
+    { "_type": "Observation", "id": "obs-001", "timestamp": "...", "subjectId": "p-1", "code": "8480-6", "value": 120 },
+    { "_type": "Diagnosis",   "id": "dx-001",  "timestamp": "...", "subjectId": "p-1", "icdCode": "J18.9", "certainty": "confirmed" }
+  ]
+}
+```
+
+Each item in the array is validated independently by the discriminator dispatch algorithm (§7.5). This is the primary mechanism for polymorphic collections in OOJS.
+
+**Characteristics of vertical relationships:**
+
+- The validator enforces the full structure of every embedded object automatically.
+- The entire object graph is self-contained in one JSON document.
+- Embedded objects do not need a globally unique identifier (though they MAY have one).
+- Appropriate for **ownership/composition**: the embedded object's lifecycle is tied to its owner.
+- Not appropriate when the same object must be referenced from multiple owners.
+
+---
+
+### 8.9 Horizontal Relationships (Non-Hierarchical / Reference by ID)
+
+A **horizontal relationship** (also called *non-hierarchical* or *association by reference*) stores only an opaque identifier that points to an associated object. The associated object is NOT embedded in the JSON; it resides in a separate location (another document, a database row, an API response).
+
+**Has-one horizontal** — expressed as a string property:
+
+```json
+"Car": {
+  "properties": {
+    "carId":   { "type": "string" },
+    "make":    { "type": "string" },
+    "model":   { "type": "string" },
+    "ownerId": { "type": "string" }
+  },
+  "required": ["carId", "make", "model", "ownerId"]
+}
+```
+
+A valid `Car` instance carries the owner's ID, not the owner's full object:
+
+```json
+{
+  "_type":   "Car",
+  "carId":   "car-001",
+  "make":    "Acme",
+  "model":   "Roadster",
+  "ownerId": "person-007"
+}
+```
+
+**Has-many horizontal** — expressed as an array of strings:
+
+```json
+"Fleet": {
+  "properties": {
+    "fleetId":   { "type": "string" },
+    "name":      { "type": "string" },
+    "carIds":    { "type": "array", "items": { "type": "string" } },
+    "personIds": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["fleetId", "name"]
+}
+```
+
+A valid `Fleet` instance holds only IDs; the `Car` and `Person` objects are fetched separately:
+
+```json
+{
+  "_type":     "Fleet",
+  "fleetId":   "fleet-001",
+  "name":      "City Fleet",
+  "carIds":    ["car-001", "car-002", "car-003"],
+  "personIds": ["person-007", "person-008"]
+}
+```
+
+**Characteristics of horizontal relationships:**
+
+- OOJS validates only the structural type of the ID property (it is a string); referential integrity — whether the referenced object actually exists — is outside the scope of this specification and MUST be enforced by the application layer.
+- The associated object has an independent lifecycle; it can be updated, transferred, or deleted without affecting the owner's JSON document.
+- The same object can be referenced by multiple owners simultaneously (many-to-many patterns).
+- The JSON document remains small even when many objects are associated.
+- Appropriate for **associations**: when the referenced object exists independently and may be shared.
+
+---
+
+### 8.10 Choosing Between Vertical and Horizontal
+
+The following guidelines assist schema authors in selecting the appropriate relationship style. They are advisory, not normative.
+
+| Question | Vertical (embed) | Horizontal (ID ref) |
+|----------|-----------------|---------------------|
+| Does the associated object have an independent identity? | No → embed | Yes → reference |
+| Can the same object be owned by multiple parents at once? | No → embed | Yes → reference |
+| Must the entire graph be validated in one pass? | Yes → embed | No → reference |
+| Is the document size a concern with large collections? | No → embed | Yes → reference |
+| Is referential integrity enforced by the schema? | Yes (automatically) | No (application responsibility) |
+| Does the associated object outlive its owner? | No → embed | Yes → reference |
+
+A single schema may freely mix vertical and horizontal relationships. For example, a `Car` might embed its `Motor` vertically (the motor has no existence outside the car) while referencing its `Owner` horizontally (the owner exists independently and may own multiple cars).
 
 ---
 

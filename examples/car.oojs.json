@@ -1,0 +1,58 @@
+{
+  "$oojs":  "1.0",
+  "$id":    "https://example.org/schemas/car",
+  "title":  "Car Domain — Vertical Relationships",
+  "description": "Demonstrates vertical (hierarchical/embedded) has-one and has-many relationships. A Car physically contains its Motor (has-one vertical) and its Wheels (has-many vertical, fixed count). The owned objects have no independent identity outside the Car document.",
+  "discriminator": "_type",
+
+  "types": {
+
+    "Motor": {
+      "title":       "Motor",
+      "description": "An internal combustion engine. Has no independent identity — it lives inside its Car.",
+      "properties": {
+        "horsepower":    { "type": "number",  "minimum": 1, "description": "Peak power output in hp" },
+        "cylinders":     { "type": "integer", "minimum": 1, "description": "Number of cylinders" },
+        "displacement":  { "type": "number",  "minimum": 0, "description": "Engine displacement in litres" },
+        "fuelType":      { "type": "string",  "enum": ["gasoline", "diesel", "electric", "hybrid"], "description": "Fuel or energy type" }
+      },
+      "required": ["horsepower", "cylinders"]
+    },
+
+    "Wheel": {
+      "title":       "Wheel",
+      "description": "A single wheel fitted to a car. Lives inside the Car's wheel array.",
+      "properties": {
+        "size":     { "type": "number",  "minimum": 10, "description": "Rim diameter in inches" },
+        "material": { "type": "string",  "enum": ["rubber", "alloy", "steel"], "description": "Primary material" },
+        "brand":    { "type": "string",  "description": "Tyre brand (optional)" }
+      },
+      "required": ["size", "material"]
+    },
+
+    "Car": {
+      "title":       "Car",
+      "description": "A car that owns its Motor (has-one vertical) and exactly four Wheels (has-many vertical, fixed count 4).",
+      "properties": {
+        "make":   { "type": "string", "minLength": 1, "description": "Manufacturer name" },
+        "model":  { "type": "string", "minLength": 1, "description": "Model name" },
+        "year":   { "type": "integer", "minimum": 1886, "description": "Model year" },
+
+        "motor": {
+          "type":        "Motor",
+          "description": "HAS-ONE VERTICAL: the Motor is embedded in the Car JSON. It is owned by and validated as part of this Car."
+        },
+
+        "wheels": {
+          "type":        "array",
+          "items":       { "type": "Wheel" },
+          "minItems":    4,
+          "maxItems":    4,
+          "description": "HAS-MANY VERTICAL (fixed count): exactly four Wheel objects embedded in the Car JSON. The Wheels are owned by and validated as part of this Car."
+        }
+      },
+      "required": ["make", "model", "motor", "wheels"]
+    }
+
+  }
+}

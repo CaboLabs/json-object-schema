@@ -1,0 +1,92 @@
+{
+  "_comment": "Valid and invalid instances for car.oojs.json — vertical (embedded) relationships",
+
+  "valid": [
+    {
+      "_comment": "Full Car with embedded Motor (has-one vertical) and four Wheels (has-many vertical)",
+      "_type":  "Car",
+      "make":   "Acme",
+      "model":  "Roadster",
+      "year":   2024,
+      "motor":  {
+        "_type":        "Motor",
+        "horsepower":   220,
+        "cylinders":    4,
+        "displacement": 2.0,
+        "fuelType":     "gasoline"
+      },
+      "wheels": [
+        { "_type": "Wheel", "size": 18, "material": "rubber", "brand": "Bridgestone" },
+        { "_type": "Wheel", "size": 18, "material": "rubber", "brand": "Bridgestone" },
+        { "_type": "Wheel", "size": 18, "material": "rubber", "brand": "Bridgestone" },
+        { "_type": "Wheel", "size": 18, "material": "rubber", "brand": "Bridgestone" }
+      ]
+    },
+    {
+      "_comment": "Minimal Car — only required fields; year and tyre brand are optional",
+      "_type":  "Car",
+      "make":   "ZipCar",
+      "model":  "Nano",
+      "motor":  { "_type": "Motor", "horsepower": 75, "cylinders": 3 },
+      "wheels": [
+        { "_type": "Wheel", "size": 15, "material": "rubber" },
+        { "_type": "Wheel", "size": 15, "material": "rubber" },
+        { "_type": "Wheel", "size": 15, "material": "rubber" },
+        { "_type": "Wheel", "size": 15, "material": "rubber" }
+      ]
+    }
+  ],
+
+  "invalid": [
+    {
+      "_comment": "ERROR: missing required embedded Motor (has-one vertical — the embedded object is required)",
+      "_type":  "Car",
+      "make":   "Acme",
+      "model":  "Ghost",
+      "wheels": [
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" }
+      ]
+    },
+    {
+      "_comment": "ERROR: only three Wheels provided — has-many vertical with fixed count (minItems=maxItems=4) not met",
+      "_type":  "Car",
+      "make":   "Acme",
+      "model":  "Tricycle",
+      "motor":  { "_type": "Motor", "horsepower": 100, "cylinders": 4 },
+      "wheels": [
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" }
+      ]
+    },
+    {
+      "_comment": "ERROR: embedded Motor is missing required property 'cylinders' — embedded objects are fully validated",
+      "_type":  "Car",
+      "make":   "Acme",
+      "model":  "Broken",
+      "motor":  { "_type": "Motor", "horsepower": 150 },
+      "wheels": [
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" }
+      ]
+    },
+    {
+      "_comment": "ERROR: Wheel has invalid enum value for 'material'",
+      "_type":  "Car",
+      "make":   "Acme",
+      "model":  "BadTyre",
+      "motor":  { "_type": "Motor", "horsepower": 150, "cylinders": 4 },
+      "wheels": [
+        { "_type": "Wheel", "size": 18, "material": "plastic" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" },
+        { "_type": "Wheel", "size": 18, "material": "rubber" }
+      ]
+    }
+  ]
+}

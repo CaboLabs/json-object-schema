@@ -1,0 +1,93 @@
+{
+  "$oojs":  "1.0",
+  "$id":    "https://example.org/schemas/fleet",
+  "title":  "Fleet Domain — Horizontal Relationships",
+  "description": "Demonstrates horizontal (non-hierarchical/reference-by-ID) has-one and has-many relationships. Objects reference each other via opaque string IDs. The referenced objects are NOT embedded — they exist independently and are looked up separately by the application. OOJS validates only the type and format of the ID values; referential integrity is the application's responsibility.",
+  "discriminator": "_type",
+
+  "types": {
+
+    "Person": {
+      "title":       "Person",
+      "description": "A person who may own or drive cars. Exists independently of any Car or Fleet.",
+      "properties": {
+        "personId": { "type": "string", "minLength": 1, "description": "Unique identifier for this person" },
+        "name":     { "type": "string", "minLength": 1, "description": "Full name" },
+        "email":    { "type": "string", "description": "Contact email (optional)" },
+
+        "carIds": {
+          "type":        "array",
+          "items":       { "type": "string" },
+          "description": "HAS-MANY HORIZONTAL: IDs of Cars owned by this Person. The Car objects are NOT embedded — they are stored and fetched separately. The same Car ID may appear in multiple Person records if ownership is shared."
+        }
+      },
+      "required": ["personId", "name"]
+    },
+
+    "Garage": {
+      "title":       "Garage",
+      "description": "A physical location where cars are stored. Exists independently of any Car.",
+      "properties": {
+        "garageId": { "type": "string", "minLength": 1, "description": "Unique identifier for this garage" },
+        "name":     { "type": "string", "minLength": 1, "description": "Garage name or address" },
+        "capacity": { "type": "integer", "minimum": 1, "description": "Maximum number of cars the garage can hold" },
+
+        "carIds": {
+          "type":        "array",
+          "items":       { "type": "string" },
+          "description": "HAS-MANY HORIZONTAL: IDs of Cars currently stored in this Garage."
+        }
+      },
+      "required": ["garageId", "name"]
+    },
+
+    "Car": {
+      "title":       "Car",
+      "description": "A car. References its owner and optional current garage by ID rather than embedding them.",
+      "properties": {
+        "carId":   { "type": "string", "minLength": 1, "description": "Unique identifier for this car" },
+        "make":    { "type": "string", "minLength": 1 },
+        "model":   { "type": "string", "minLength": 1 },
+        "year":    { "type": "integer", "minimum": 1886 },
+
+        "ownerId": {
+          "type":        "string",
+          "description": "HAS-ONE HORIZONTAL: the ID of the Person who owns this Car. The Person object is NOT embedded."
+        },
+
+        "garageId": {
+          "type":        "string",
+          "description": "HAS-ONE HORIZONTAL (optional): the ID of the Garage where this Car is currently parked. Absent if not in a garage."
+        }
+      },
+      "required": ["carId", "make", "model", "ownerId"]
+    },
+
+    "Fleet": {
+      "title":       "Fleet",
+      "description": "A named collection of cars and associated personnel. References both Cars and Persons by ID.",
+      "properties": {
+        "fleetId":    { "type": "string", "minLength": 1, "description": "Unique identifier for this fleet" },
+        "name":       { "type": "string", "minLength": 1, "description": "Fleet display name" },
+        "operatorId": {
+          "type":        "string",
+          "description": "HAS-ONE HORIZONTAL: ID of the Person responsible for managing this Fleet."
+        },
+
+        "carIds": {
+          "type":        "array",
+          "items":       { "type": "string" },
+          "description": "HAS-MANY HORIZONTAL: IDs of Cars belonging to this Fleet. The same Car cannot be in two Fleets simultaneously — enforced by the application, not by OOJS."
+        },
+
+        "personIds": {
+          "type":        "array",
+          "items":       { "type": "string" },
+          "description": "HAS-MANY HORIZONTAL: IDs of Persons associated with this Fleet (drivers, managers, etc.)."
+        }
+      },
+      "required": ["fleetId", "name"]
+    }
+
+  }
+}
