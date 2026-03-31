@@ -137,9 +137,11 @@ OOJS defines the following primitive types, aligned with the JSON type system:
 
 A JSON number `42` is valid for both `integer` and `number`. A JSON number `42.5` is valid only for `number`.
 
+The primitive type names and the `integer`/`number` distinction are adopted directly from [JSON-SCHEMA]. The underlying JSON value types (`string`, `number`, `boolean`, `null`) are defined in [RFC8259].
+
 ### 3.2 Array Types
 
-An array type is an ordered, homogeneous collection of values of a single item type. The item type may be a primitive type or a named type reference.
+An array type is an ordered, homogeneous collection of values of a single item type. The item type may be a primitive type or a named type reference. JSON arrays are defined in [RFC8259]; OOJS restricts them to a single item type (homogeneous arrays), which is a stricter constraint than JSON itself imposes.
 
 ### 3.3 Type References
 
@@ -173,6 +175,8 @@ An OOJS schema document MUST be a JSON object with the following members:
   "types":        <object>               REQUIRED
 }
 ```
+
+The `title` and `description` fields are adopted from [JSON-SCHEMA] with the same semantics: they are human-readable annotations and do not affect validation.
 
 Additional members not defined in this specification SHOULD be ignored by conforming processors (open extension model at the document level).
 
@@ -262,7 +266,7 @@ The discriminator value MUST be unique across all types in the combined registry
 
 ### 5.5 `properties`
 
-A JSON object whose keys are property names (see §11) and values are property definitions (see §6).
+A JSON object whose keys are property names (see §11) and values are property definitions (see §6). The keyword `properties` is adopted from [JSON-SCHEMA] with the same meaning: a map from property name to property definition. Unlike [JSON-SCHEMA], OOJS does not allow property re-declaration across the inheritance chain.
 
 The following conditions MUST hold:
 - A property name MUST NOT be the same as the schema's discriminator property name.
@@ -272,6 +276,8 @@ The following conditions MUST hold:
 ### 5.6 `required`
 
 An array of strings. Each string MUST be the name of a property declared in this type's own `properties` map. Listing inherited property names in a subtype's `required` is NOT permitted (they are already required if declared required in the parent).
+
+The keyword `required` is adopted from [JSON-SCHEMA]. The key difference is that in OOJS `required` lists only properties declared on this specific type; inherited required constraints are automatically propagated through the `effectiveRequired` computation (see §9.5) rather than being repeated in subtype definitions.
 
 The effective required set of a type T is computed as:
 
@@ -300,30 +306,36 @@ A property definition is a JSON object whose `"type"` member determines its kind
 }
 ```
 
-Where `<primitive>` ∈ { `"string"`, `"integer"`, `"number"`, `"boolean"`, `"null"` }.
+Where `<primitive>` ∈ { `"string"`, `"integer"`, `"number"`, `"boolean"`, `"null"` }. These type names are the same as in [JSON-SCHEMA]. The `title` and `description` fields are adopted from [JSON-SCHEMA] as human-readable annotations.
 
 #### 6.1.1 String Constraints
 
-| Keyword | Type | Constraint |
-|---------|------|-----------|
-| `minLength` | integer ≥ 0 | `len(value) >= minLength` (Unicode code points) |
-| `maxLength` | integer ≥ 0 | `len(value) <= maxLength` |
-| `pattern` | string | ECMA-262 regex; value must produce a match |
-| `enum` | non-empty array of strings | value must equal one element |
-| `format` | string | Semantic hint; informational in v1.0 |
+All string constraint keywords are adopted from [JSON-SCHEMA] with identical semantics and the same type requirements.
+
+| Keyword | Type | Constraint | JSON Schema ref |
+|---------|------|-----------|----------------|
+| `minLength` | integer ≥ 0 | `len(value) >= minLength` (Unicode code points) | [JSON-SCHEMA] §6.3.2 |
+| `maxLength` | integer ≥ 0 | `len(value) <= maxLength` | [JSON-SCHEMA] §6.3.3 |
+| `pattern` | string | ECMA-262 [ECMA-262] regex; value must produce a match | [JSON-SCHEMA] §6.3.3 |
+| `enum` | non-empty array of strings | value must equal one element | [JSON-SCHEMA] §6.1.2 |
+| `format` | string | Semantic hint; informational in v1.0 | [JSON-SCHEMA] §7.3 |
+
+String length is measured in Unicode code points, consistent with [JSON-SCHEMA]. The `pattern` value MUST be a valid ECMA-262 [ECMA-262] regular expression.
 
 When both `minLength` and `maxLength` are present, `minLength` MUST be ≤ `maxLength`.
 
 #### 6.1.2 Number / Integer Constraints
 
-| Keyword | Type | Constraint |
-|---------|------|-----------|
-| `minimum` | number | `value >= minimum` |
-| `maximum` | number | `value <= maximum` |
-| `exclusiveMinimum` | number | `value > exclusiveMinimum` |
-| `exclusiveMaximum` | number | `value < exclusiveMaximum` |
-| `multipleOf` | number > 0 | `value % multipleOf == 0` |
-| `enum` | non-empty array of numbers | value must equal one element |
+All numeric constraint keywords are adopted from [JSON-SCHEMA] with identical semantics.
+
+| Keyword | Type | Constraint | JSON Schema ref |
+|---------|------|-----------|----------------|
+| `minimum` | number | `value >= minimum` | [JSON-SCHEMA] §6.2.4 |
+| `maximum` | number | `value <= maximum` | [JSON-SCHEMA] §6.2.2 |
+| `exclusiveMinimum` | number | `value > exclusiveMinimum` | [JSON-SCHEMA] §6.2.5 |
+| `exclusiveMaximum` | number | `value < exclusiveMaximum` | [JSON-SCHEMA] §6.2.3 |
+| `multipleOf` | number > 0 | `value % multipleOf == 0` | [JSON-SCHEMA] §6.2.1 |
+| `enum` | non-empty array of numbers | value must equal one element | [JSON-SCHEMA] §6.1.2 |
 
 `minimum` and `exclusiveMinimum` MUST NOT both be present. `maximum` and `exclusiveMaximum` MUST NOT both be present.
 
@@ -331,7 +343,7 @@ When both a lower bound and upper bound are present, the lower bound MUST be les
 
 #### 6.1.3 Boolean and Null Constraints
 
-No constraints are defined for `boolean` or `null` primitive types.
+No constraints are defined for `boolean` or `null` primitive types. This is consistent with [JSON-SCHEMA], which also defines no validation keywords specific to these types.
 
 ### 6.2 Type Reference Property
 
@@ -363,13 +375,15 @@ No constraints are defined for `boolean` or `null` primitive types.
 }
 ```
 
-| Keyword | Required | Notes |
-|---------|----------|-------|
-| `type` | REQUIRED | Must be `"array"` |
-| `items` | REQUIRED | Item type definition (inline primitive or type ref) |
-| `minItems` | OPTIONAL | Default: 0 |
-| `maxItems` | OPTIONAL | Default: unbounded |
-| `uniqueItems` | OPTIONAL | Default: `false` |
+The keywords `items`, `minItems`, `maxItems`, and `uniqueItems` are adopted from [JSON-SCHEMA] §6.4 with identical semantics.
+
+| Keyword | Required | Notes | JSON Schema ref |
+|---------|----------|-------|----------------|
+| `type` | REQUIRED | Must be `"array"` | — |
+| `items` | REQUIRED | Item type definition (inline primitive or type ref) | [JSON-SCHEMA] §10.3.1.2 |
+| `minItems` | OPTIONAL | Default: 0 | [JSON-SCHEMA] §6.4.2 |
+| `maxItems` | OPTIONAL | Default: unbounded | [JSON-SCHEMA] §6.4.3 |
+| `uniqueItems` | OPTIONAL | Default: `false` | [JSON-SCHEMA] §6.4.1 |
 
 When both `minItems` and `maxItems` are present, `minItems` MUST be ≤ `maxItems`.
 
@@ -1103,6 +1117,8 @@ function validateProperty(value V, propertyDefinition P, path, registry R):
 
 ### 9.3 Primitive Validation (`validatePrimitive`)
 
+All constraint checks in this section correspond directly to the validation keywords adopted from [JSON-SCHEMA] (§6.1 String Constraints, §6.1.2 Numeric Constraints). String length is measured in Unicode code points as specified in [JSON-SCHEMA] §6.3.2–6.3.3. The `pattern` keyword uses ECMA-262 [ECMA-262] regular expression syntax, matching the behaviour defined in [JSON-SCHEMA] §6.3.3.
+
 ```
 function validatePrimitive(value V, propertyDefinition P, path):
     expectedKind = kindOf(P.type)  # string/integer/number/boolean/null
@@ -1413,14 +1429,15 @@ An adversarially crafted schema with very deep inheritance chains or very large 
 
 ### Normative References
 
-- **[RFC2119]** Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels", BCP 14, RFC 2119, March 1997.
-- **[RFC3986]** Berners-Lee, T., Fielding, R., and Masinter, L., "Uniform Resource Identifier (URI): Generic Syntax", RFC 3986, January 2005.
-- **[RFC6901]** Bryan, P., Ed., Zyp, K., and Nottingham, M., Ed., "JavaScript Object Notation (JSON) Pointer", RFC 6901, April 2013.
-- **[RFC8259]** Bray, T., Ed., "The JavaScript Object Notation (JSON) Data Interchange Format", RFC 8259, December 2017.
-- **[JSON-SCHEMA]** Wright, A., Andrews, H., Hutton, B., "JSON Schema: A Media Type for Describing JSON Documents", draft-bhutton-json-schema-01, December 2020.
+- **[RFC2119]** Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels", BCP 14, RFC 2119, March 1997. <https://www.rfc-editor.org/rfc/rfc2119>
+- **[RFC3986]** Berners-Lee, T., Fielding, R., and Masinter, L., "Uniform Resource Identifier (URI): Generic Syntax", RFC 3986, January 2005. <https://www.rfc-editor.org/rfc/rfc3986>
+- **[RFC6901]** Bryan, P., Ed., Zyp, K., and Nottingham, M., Ed., "JavaScript Object Notation (JSON) Pointer", RFC 6901, April 2013. <https://www.rfc-editor.org/rfc/rfc6901>
+- **[RFC8259]** Bray, T., Ed., "The JavaScript Object Notation (JSON) Data Interchange Format", RFC 8259, December 2017. <https://www.rfc-editor.org/rfc/rfc8259>
+- **[JSON-SCHEMA]** Wright, A., Andrews, H., Hutton, B., "JSON Schema Validation: A Vocabulary for Structural Validation of JSON", draft-bhutton-json-schema-validation-01, December 2020. <https://json-schema.org/draft/2020-12/json-schema-validation>
+- **[ECMA-262]** Ecma International, "ECMAScript Language Specification", ECMA-262, 14th edition, June 2023. <https://tc39.es/ecma262/> — referenced for the regular expression syntax used by the `pattern` keyword (§6.1.1, §9.3).
 
 ### Informative References
 
-- **[OPENAPI]** OpenAPI Initiative, "OpenAPI Specification 3.1.0", February 2021.
-- **[XSD]** W3C, "XML Schema Part 1: Structures Second Edition", October 2004.
-- **[AVRO]** Apache Software Foundation, "Apache Avro Specification", 2023.
+- **[OPENAPI]** OpenAPI Initiative, "OpenAPI Specification 3.1.0", February 2021. <https://spec.openapis.org/oas/v3.1.0>
+- **[XSD]** W3C, "XML Schema Part 1: Structures Second Edition", October 2004. <https://www.w3.org/TR/xmlschema-1/>
+- **[AVRO]** Apache Software Foundation, "Apache Avro Specification", 2023. <https://avro.apache.org/docs/current/specification/>

@@ -4,6 +4,9 @@
   "title": "openEHR Data Types Information Model",
   "description": "OOJS representation of the openEHR RM data_types package (RM Release 1.1.0). Covers the basic, text, quantity, date_time, time_specification, encapsulated, and uri packages.",
   "discriminator": "_type",
+  "imports": {
+    "bt": "https://specifications.openehr.org/schemas/oojs/base/base_types"
+  },
   "types": {
 
     "DATA_VALUE": {
@@ -42,18 +45,10 @@
       "required": ["id"]
     },
 
-    "TERMINOLOGY_ID": {
-      "description": "Identifier of a terminology. The value attribute holds the terminology name, optionally with a version suffix, e.g. 'SNOMED-CT(2003)'.",
-      "properties": {
-        "value": { "type": "string" }
-      },
-      "required": ["value"]
-    },
-
     "CODE_PHRASE": {
       "description": "A fully coordinated term from a terminology service, identified by a terminology_id and a code_string.",
       "properties": {
-        "terminology_id":  { "type": "TERMINOLOGY_ID" },
+        "terminology_id":  { "type": "bt.TERMINOLOGY_ID" },
         "code_string":     { "type": "string", "description": "The key used by the terminology service to identify a concept." },
         "preferred_term":  { "type": "string", "description": "Optional preferred term corresponding to the code_string." }
       },

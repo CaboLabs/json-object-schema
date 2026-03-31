@@ -199,13 +199,8 @@
     },
 
     "VERSIONED_FOLDER": {
-      "description": "A version-controlled hierarchy of FOLDERs, providing the effect of a versioned directory. Each version of the container holds a FOLDER tree. Inherits VERSIONED_OBJECT semantics.",
-      "properties": {
-        "uid":          { "type": "bt.HIER_OBJECT_ID", "description": "Unique identifier of this version container." },
-        "owner_id":     { "type": "bt.OBJECT_REF",     "description": "Reference to the owning object, e.g. the EHR." },
-        "time_created": { "type": "dt.DV_DATE_TIME",   "description": "Time of initial creation of this versioned object." }
-      },
-      "required": ["uid", "owner_id", "time_created"]
+      "extends": "VERSIONED_OBJECT",
+      "description": "A version-controlled hierarchy of FOLDERs, providing the effect of a versioned directory. Each version of the container holds a FOLDER tree."
     },
 
     "VERSION": {

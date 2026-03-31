@@ -2,84 +2,23 @@
   "$oojs": "1.0",
   "$id": "https://specifications.openehr.org/schemas/oojs/rm/data_structures",
   "title": "openEHR Data Structures Information Model",
-  "description": "OOJS representation of the openEHR RM data_structures package (RM Release 1.1.0). Covers the item_structure, representation, and history packages, together with the LOCATABLE ancestry types from the common RM that are required as bases.",
+  "description": "OOJS representation of the openEHR RM data_structures package (RM Release 1.1.0). Covers the item_structure, representation, and history packages. LOCATABLE ancestry types (PATHABLE, LOCATABLE, ARCHETYPED, LINK, FEEDER_AUDIT, FEEDER_AUDIT_DETAILS) are imported from the common schema.",
   "discriminator": "_type",
   "imports": {
-    "dt": "https://specifications.openehr.org/schemas/oojs/rm/data_types"
+    "bt": "https://specifications.openehr.org/schemas/oojs/base/base_types",
+    "dt": "https://specifications.openehr.org/schemas/oojs/rm/data_types",
+    "cm": "https://specifications.openehr.org/schemas/oojs/rm/common"
   },
   "types": {
 
-    "ARCHETYPED": {
-      "description": "Archetype identification metadata attached to archetype root points. Records the archetype_id, optional template_id, and the RM version used to create the object.",
-      "properties": {
-        "archetype_id": { "type": "string", "description": "Globally unique archetype identifier, e.g. 'openEHR-EHR-OBSERVATION.blood_pressure.v1'." },
-        "template_id":  { "type": "string", "description": "Optional globally unique template identifier." },
-        "rm_version":   { "type": "string", "description": "Version of the openEHR RM used to create this object, e.g. '1.1.0'." }
-      },
-      "required": ["archetype_id", "rm_version"]
-    },
-
-    "LINK": {
-      "description": "A logical relationship between two archetyped structures, expressed as a typed, meaningful directed link to a target DV_EHR_URI.",
-      "properties": {
-        "meaning": { "type": "dt.DV_TEXT",    "description": "Clinical description of the relationship, e.g. 'in response to', 'follow-up to'." },
-        "type":    { "type": "dt.DV_TEXT",    "description": "Domain-level type of the link, e.g. 'problem', 'issue'." },
-        "target":  { "type": "dt.DV_EHR_URI", "description": "The target object of the link relation." }
-      },
-      "required": ["meaning", "type", "target"]
-    },
-
-    "FEEDER_AUDIT_DETAILS": {
-      "description": "Audit details for one system in a feeder chain: who/where/when the information item was created or handled.",
-      "properties": {
-        "system_id":    { "type": "string",          "description": "Identifier of the system that handled the item." },
-        "version_id":   { "type": "string",          "description": "Optional version identifier used in the source system." },
-        "time":         { "type": "dt.DV_DATE_TIME", "description": "Optional time of handling the item." },
-        "other_details":{ "type": "ITEM_STRUCTURE",  "description": "Optional custom meta-data, may be archetyped." }
-      },
-      "required": ["system_id"]
-    },
-
-    "FEEDER_AUDIT": {
-      "description": "Audit trail describing the origin of data transformed into openEHR form from a feeder or legacy system.",
-      "properties": {
-        "originating_system_item_ids": {
-          "type": "array", "items": { "type": "dt.DV_IDENTIFIER" },
-          "description": "Identifiers for the item in the originating system."
-        },
-        "feeder_system_item_ids": {
-          "type": "array", "items": { "type": "dt.DV_IDENTIFIER" },
-          "description": "Identifiers for the item in the feeder system, if distinct from the originating system."
-        },
-        "original_content":        { "type": "dt.DV_ENCAPSULATED",    "description": "Optional inline or referenced original content." },
-        "originating_system_audit":{ "type": "FEEDER_AUDIT_DETAILS",  "description": "Audit information from the originating system." },
-        "feeder_system_audit":     { "type": "FEEDER_AUDIT_DETAILS",  "description": "Optional audit information from the feeder system." }
-      },
-      "required": ["originating_system_audit"]
-    },
-
-    "LOCATABLE": {
-      "abstract": true,
-      "description": "Abstract root of all information model classes that can be archetyped and path-addressed. Carries a runtime name, a design-time archetype_node_id, and optional uid, links, archetype_details, and feeder_audit.",
-      "properties": {
-        "name":               { "type": "dt.DV_TEXT", "description": "Runtime name of this node, used to build runtime paths." },
-        "archetype_node_id":  { "type": "string",     "description": "Design-time archetype node identifier, e.g. 'at0005'. At archetype root points this is the stringified archetype_id." },
-        "uid":                { "type": "string",     "description": "Optional globally unique identifier for archetype root points." },
-        "links":              { "type": "array", "items": { "type": "LINK" }, "minItems": 1, "description": "Optional links to other archetyped structures." },
-        "archetype_details":  { "type": "ARCHETYPED",    "description": "Archetype identification metadata; present only at archetype root points." },
-        "feeder_audit":       { "type": "FEEDER_AUDIT",  "description": "Optional audit trail from a feeder or legacy system." }
-      },
-      "required": ["name", "archetype_node_id"]
-    },
-
     "DATA_STRUCTURE": {
-      "extends": "LOCATABLE",
+      "extends": "cm.LOCATABLE",
       "abstract": true,
       "description": "Abstract parent of all data structure types. Each subtype implements as_hierarchy() to produce a CEN EN13606-compatible single-hierarchy representation."
     },
 
     "ITEM": {
-      "extends": "LOCATABLE",
+      "extends": "cm.LOCATABLE",
       "abstract": true,
       "description": "Abstract parent of the CLUSTER and ELEMENT representation classes. Compatible with ISO 13606-1 classes of the same names."
     },
@@ -160,7 +99,7 @@
     },
 
     "EVENT": {
-      "extends": "LOCATABLE",
+      "extends": "cm.LOCATABLE",
       "abstract": true,
       "description": "Abstract notion of a single event in a time series. The data attribute holds the event's ITEM_STRUCTURE payload; the optional state attribute holds contextual state data at the time of the event.",
       "properties": {
