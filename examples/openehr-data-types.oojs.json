@@ -1,0 +1,350 @@
+{
+  "$oojs": "1.0",
+  "$id": "https://specifications.openehr.org/schemas/oojs/rm/data_types",
+  "title": "openEHR Data Types Information Model",
+  "description": "OOJS representation of the openEHR RM data_types package (RM Release 1.1.0). Covers the basic, text, quantity, date_time, time_specification, encapsulated, and uri packages.",
+  "discriminator": "_type",
+  "types": {
+
+    "DATA_VALUE": {
+      "abstract": true,
+      "description": "Abstract parent of all DV_ data value types."
+    },
+
+    "DV_BOOLEAN": {
+      "extends": "DATA_VALUE",
+      "description": "Items which are truly boolean data, such as true/false or yes/no answers.",
+      "properties": {
+        "value": { "type": "boolean" }
+      },
+      "required": ["value"]
+    },
+
+    "DV_STATE": {
+      "extends": "DATA_VALUE",
+      "description": "For representing state values which obey a defined state machine. The state name is a coded term; is_terminal indicates whether no further transitions are possible.",
+      "properties": {
+        "value":       { "type": "DV_CODED_TEXT" },
+        "is_terminal": { "type": "boolean" }
+      },
+      "required": ["value", "is_terminal"]
+    },
+
+    "DV_IDENTIFIER": {
+      "extends": "DATA_VALUE",
+      "description": "Type for representing identifiers of real-world entities such as drivers licence numbers, social security numbers, prescription ids, etc.",
+      "properties": {
+        "id":       { "type": "string", "description": "The identifier value." },
+        "issuer":   { "type": "string", "description": "Optional authority which issues the kind of id." },
+        "assigner": { "type": "string", "description": "Optional organisation that assigned the id." },
+        "type":     { "type": "string", "description": "Optional identifier type, e.g. 'prescription', 'Social Security Number'." }
+      },
+      "required": ["id"]
+    },
+
+    "TERMINOLOGY_ID": {
+      "description": "Identifier of a terminology. The value attribute holds the terminology name, optionally with a version suffix, e.g. 'SNOMED-CT(2003)'.",
+      "properties": {
+        "value": { "type": "string" }
+      },
+      "required": ["value"]
+    },
+
+    "CODE_PHRASE": {
+      "description": "A fully coordinated term from a terminology service, identified by a terminology_id and a code_string.",
+      "properties": {
+        "terminology_id":  { "type": "TERMINOLOGY_ID" },
+        "code_string":     { "type": "string", "description": "The key used by the terminology service to identify a concept." },
+        "preferred_term":  { "type": "string", "description": "Optional preferred term corresponding to the code_string." }
+      },
+      "required": ["terminology_id", "code_string"]
+    },
+
+    "TERM_MAPPING": {
+      "description": "A coded term mapped to a DV_TEXT, with a match qualifier indicating the relative breadth of the mapping ('>', '=', '<', '?').",
+      "properties": {
+        "match":   {
+          "type": "string",
+          "enum": [">", "=", "<", "?"],
+          "description": "Relative match: '>' broader, '=' equivalent, '<' narrower, '?' unknown."
+        },
+        "purpose": { "type": "DV_CODED_TEXT", "description": "Optional purpose of the mapping, e.g. 'billing', 'interoperability'." },
+        "target":  { "type": "CODE_PHRASE",   "description": "The target term of the mapping." }
+      },
+      "required": ["match", "target"]
+    },
+
+    "DV_TEXT": {
+      "extends": "DATA_VALUE",
+      "description": "A text item, which may optionally be coded. The primary content is the value string; optional attributes carry formatting hints, hyperlinks, terminology mappings, and language/charset metadata.",
+      "properties": {
+        "value":      { "type": "string", "description": "The text string." },
+        "formatting": { "type": "string", "description": "Optional formatting hint, e.g. 'plain', 'markdown'." },
+        "hyperlink":  { "type": "DV_URI",  "description": "Deprecated: optional web link associated with the text." },
+        "mappings":   { "type": "array", "items": { "type": "TERM_MAPPING" }, "description": "Optional list of mappings to coded terms in other terminologies." },
+        "language":   { "type": "CODE_PHRASE", "description": "Optional language of the text value, coded from openEHR Code Set 'languages'." },
+        "charset":    { "type": "CODE_PHRASE", "description": "Optional character encoding scheme, coded from openEHR Code Set 'character sets'." }
+      },
+      "required": ["value"]
+    },
+
+    "DV_CODED_TEXT": {
+      "extends": "DV_TEXT",
+      "description": "A text item whose value is the rubric of a controlled terminology term. The code is held in defining_code.",
+      "properties": {
+        "defining_code": { "type": "CODE_PHRASE", "description": "The term of which the value attribute is the textual rendition." }
+      },
+      "required": ["defining_code"]
+    },
+
+    "DV_PARAGRAPH": {
+      "extends": "DATA_VALUE",
+      "description": "DEPRECATED: use markdown-formatted DV_TEXT instead. A composite text value consisting of a series of DV_TEXT items forming a paragraph.",
+      "properties": {
+        "items": { "type": "array", "items": { "type": "DV_TEXT" }, "minItems": 1 }
+      },
+      "required": ["items"]
+    },
+
+    "DV_ORDERED": {
+      "extends": "DATA_VALUE",
+      "abstract": true,
+      "description": "Abstract class for data value types that have a defined ordering. Provides optional normal_status, normal_range, and other_reference_ranges.",
+      "properties": {
+        "normal_status":        { "type": "CODE_PHRASE",  "description": "Optional normal status indicator coded from openEHR 'normal_status' group (HHH, HH, H, N, L, LL, LLL)." },
+        "normal_range":         { "type": "DV_INTERVAL",  "description": "Optional normal range." },
+        "other_reference_ranges": { "type": "array", "items": { "type": "REFERENCE_RANGE" }, "description": "Optional tagged other reference ranges." }
+      }
+    },
+
+    "DV_INTERVAL": {
+      "extends": "DATA_VALUE",
+      "description": "Generic interval of a comparable DV_ORDERED type. Represents a contiguous subrange with optional lower/upper bounds and unbounded flags. The lower and upper values, when present, must be instances of the same concrete DV_ORDERED subtype.",
+      "properties": {
+        "lower":           { "type": "DV_ORDERED", "description": "Lower bound; absent when lower_unbounded is true." },
+        "upper":           { "type": "DV_ORDERED", "description": "Upper bound; absent when upper_unbounded is true." },
+        "lower_unbounded": { "type": "boolean",    "description": "True if the interval is unbounded below." },
+        "upper_unbounded": { "type": "boolean",    "description": "True if the interval is unbounded above." },
+        "lower_included":  { "type": "boolean",    "description": "True if the lower bound is included in the interval." },
+        "upper_included":  { "type": "boolean",    "description": "True if the upper bound is included in the interval." }
+      },
+      "required": ["lower_unbounded", "upper_unbounded"]
+    },
+
+    "REFERENCE_RANGE": {
+      "description": "A named range associated with a DV_ORDERED datum, e.g. 'normal', 'critical', 'therapeutic'.",
+      "properties": {
+        "meaning": { "type": "DV_TEXT",     "description": "Term indicating the meaning of this range." },
+        "range":   { "type": "DV_INTERVAL", "description": "The data range for this meaning." }
+      },
+      "required": ["meaning", "range"]
+    },
+
+    "DV_ORDINAL": {
+      "extends": "DV_ORDERED",
+      "description": "Integral score values with implied ordering but no assumption of equal spacing between values. Examples: Apgar, Glasgow Coma Scale.",
+      "properties": {
+        "symbol": { "type": "DV_CODED_TEXT", "description": "Coded textual representation of this value in the enumeration." },
+        "value":  { "type": "integer",       "description": "Integer value in the ordered enumeration." }
+      },
+      "required": ["symbol", "value"]
+    },
+
+    "DV_SCALE": {
+      "extends": "DV_ORDERED",
+      "description": "Scale values with implied ordering, no assumption of equal spacing, and non-integer values allowed. Example: Borg CR 10 scale.",
+      "properties": {
+        "symbol": { "type": "DV_CODED_TEXT", "description": "Coded textual representation of this scale value." },
+        "value":  { "type": "number",        "description": "Real number value of the scale item." }
+      },
+      "required": ["symbol", "value"]
+    },
+
+    "DV_QUANTIFIED": {
+      "extends": "DV_ORDERED",
+      "abstract": true,
+      "description": "Abstract class for quantified data values that have a numeric magnitude and an optional magnitude_status qualifier.",
+      "properties": {
+        "magnitude_status": {
+          "type": "string",
+          "enum": ["=", "<", ">", "<=", ">=", "~"],
+          "description": "Optional status: '=' exact, '<' less than, '>' greater than, '<=' less than or equal, '>=' greater than or equal, '~' approximately equal."
+        }
+      }
+    },
+
+    "DV_AMOUNT": {
+      "extends": "DV_QUANTIFIED",
+      "abstract": true,
+      "description": "Abstract class for relative quantities that can be added or subtracted. Provides accuracy as a Real value and an accuracy_is_percent flag.",
+      "properties": {
+        "accuracy":          { "type": "number",  "description": "Accuracy of the value. -1 means unknown. 0 means 100% accurate." },
+        "accuracy_is_percent": { "type": "boolean", "description": "If true, accuracy is expressed as a percentage; otherwise as an absolute value." }
+      }
+    },
+
+    "DV_QUANTITY": {
+      "extends": "DV_AMOUNT",
+      "description": "A quantity with a real-number magnitude and scientific units (UCUM by default). Used for measurable physical quantities.",
+      "properties": {
+        "magnitude":          { "type": "number",  "description": "Numeric magnitude of the quantity." },
+        "units":              { "type": "string",  "description": "Units code, e.g. 'kg/m^2', 'mm[Hg]', 'ms-1'. UCUM case-sensitive form by default." },
+        "precision":          { "type": "integer", "description": "Number of decimal places. 0 = integral; -1 = unlimited." },
+        "units_system":       { "type": "string",  "description": "Optional URI identifying the units system when not UCUM." },
+        "units_display_name": { "type": "string",  "description": "Optional displayable form of the units, e.g. '°C'." }
+      },
+      "required": ["magnitude", "units"]
+    },
+
+    "DV_COUNT": {
+      "extends": "DV_AMOUNT",
+      "description": "Countable quantities such as number of pregnancies or steps. Not for physical entities that have units.",
+      "properties": {
+        "magnitude": { "type": "integer", "description": "Integer count value." }
+      },
+      "required": ["magnitude"]
+    },
+
+    "DV_PROPORTION": {
+      "extends": "DV_AMOUNT",
+      "description": "A ratio of two real numbers. The type attribute controls the semantic kind of proportion (ratio, unitary, percent, fraction, integer fraction).",
+      "properties": {
+        "numerator":   { "type": "number",  "description": "Numerator of the ratio." },
+        "denominator": { "type": "number",  "description": "Denominator of the ratio. Must not be 0." },
+        "type":        {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4],
+          "description": "Proportion kind: 0=ratio, 1=unitary (denominator=1), 2=percent (denominator=100), 3=fraction (integral), 4=integer_fraction."
+        },
+        "precision":   { "type": "integer", "description": "Optional decimal places for numerator and denominator. 0 = integral; -1 = unlimited." }
+      },
+      "required": ["numerator", "denominator", "type"]
+    },
+
+    "DV_ABSOLUTE_QUANTITY": {
+      "extends": "DV_QUANTIFIED",
+      "abstract": true,
+      "description": "Abstract class for quantities whose values are absolute with respect to an origin. Dates and times are the primary examples. The accuracy attribute is a DV_AMOUNT.",
+      "properties": {
+        "accuracy": { "type": "DV_AMOUNT", "description": "Optional accuracy expressed as a differential amount." }
+      }
+    },
+
+    "DV_TEMPORAL": {
+      "extends": "DV_ABSOLUTE_QUANTITY",
+      "abstract": true,
+      "description": "Abstract temporal variant of DV_ABSOLUTE_QUANTITY whose diff type is DV_DURATION.",
+      "properties": {
+        "accuracy": { "type": "DV_DURATION", "description": "Optional time accuracy expressed as a duration." }
+      }
+    },
+
+    "DV_DATE": {
+      "extends": "DV_TEMPORAL",
+      "description": "An absolute point in time specified to the day, as an ISO 8601 date string. Partial dates (year only, or year+month) are allowed.",
+      "properties": {
+        "value": { "type": "string", "description": "ISO 8601 date string, e.g. '2024-03-29', '2024-03', '2024'." }
+      },
+      "required": ["value"]
+    },
+
+    "DV_TIME": {
+      "extends": "DV_TEMPORAL",
+      "description": "An absolute point in time from the start of the current day, specified to a fraction of a second, as an ISO 8601 time string.",
+      "properties": {
+        "value": { "type": "string", "description": "ISO 8601 time string, e.g. '10:30:00', '10:30:00.000+02:00'." }
+      },
+      "required": ["value"]
+    },
+
+    "DV_DATE_TIME": {
+      "extends": "DV_TEMPORAL",
+      "description": "An absolute point in time specified to the second, as an ISO 8601 date-time string.",
+      "properties": {
+        "value": { "type": "string", "description": "ISO 8601 date-time string, e.g. '2024-03-29T10:30:00Z'." }
+      },
+      "required": ["value"]
+    },
+
+    "DV_DURATION": {
+      "extends": "DV_AMOUNT",
+      "description": "A period of time relative to a notional point. ISO 8601 duration string with two openEHR extensions: a leading '-' for negative durations, and 'W' may be mixed with other designators.",
+      "properties": {
+        "value": { "type": "string", "description": "ISO 8601 duration string, e.g. 'P1Y2M3DT4H5M6S', '-P3M', 'P1W2D'." }
+      },
+      "required": ["value"]
+    },
+
+    "DV_TIME_SPECIFICATION": {
+      "extends": "DATA_VALUE",
+      "abstract": true,
+      "description": "Abstract class for all timing specifications. Specifies points in time, possibly linked to the calendar or a real-world repeating event.",
+      "properties": {
+        "value": { "type": "DV_PARSABLE", "description": "The specification in HL7v3 PIVL or EIVL syntax." }
+      },
+      "required": ["value"]
+    },
+
+    "DV_PERIODIC_TIME_SPECIFICATION": {
+      "extends": "DV_TIME_SPECIFICATION",
+      "description": "Specifies periodic points in time, phase-linked to the calendar or event-linked to a real-world repeating event. Based on HL7v3 PIVL<T> and EIVL<T>. The value formalism must be 'HL7:PIVL' or 'HL7:EIVL'."
+    },
+
+    "DV_GENERAL_TIME_SPECIFICATION": {
+      "extends": "DV_TIME_SPECIFICATION",
+      "description": "Specifies points in time using the HL7v3 GTS general time specification syntax."
+    },
+
+    "DV_ENCAPSULATED": {
+      "extends": "DATA_VALUE",
+      "abstract": true,
+      "description": "Abstract class defining common metadata for all encapsulated data types whose internal structure is defined outside the EHR model.",
+      "properties": {
+        "charset":  { "type": "CODE_PHRASE", "description": "Optional character encoding scheme, coded from openEHR Code Set 'character sets'." },
+        "language": { "type": "CODE_PHRASE", "description": "Optional language of the data, coded from openEHR Code Set 'languages'." }
+      }
+    },
+
+    "DV_MULTIMEDIA": {
+      "extends": "DV_ENCAPSULATED",
+      "description": "Encapsulated audiovisual or bio-signal data. Content may be stored inline (data) or by reference (uri), or both.",
+      "properties": {
+        "alternate_text":           { "type": "string",      "description": "Text to display in lieu of multimedia display/replay." },
+        "uri":                      { "type": "DV_URI",      "description": "URI reference to externally stored content." },
+        "data":                     { "type": "string",      "description": "Inline content encoded as a Base64 string (represents Array<Byte>)." },
+        "media_type":               { "type": "CODE_PHRASE", "description": "IANA MIME media type, coded from openEHR Code Set 'media types'." },
+        "compression_algorithm":    { "type": "CODE_PHRASE", "description": "Optional compression algorithm, coded from openEHR integrity check code set." },
+        "integrity_check":          { "type": "string",      "description": "Optional binary cryptographic integrity checksum, Base64-encoded." },
+        "integrity_check_algorithm":{ "type": "CODE_PHRASE", "description": "Type of integrity check, coded from openEHR integrity check code set." },
+        "thumbnail":                { "type": "DV_MULTIMEDIA","description": "Optional thumbnail for this item." },
+        "size":                     { "type": "integer",     "minimum": 0, "description": "Original size in bytes of unencoded data." }
+      },
+      "required": ["media_type", "size"]
+    },
+
+    "DV_PARSABLE": {
+      "extends": "DV_ENCAPSULATED",
+      "description": "Encapsulated data expressed as a parsable string. The formalism attribute names the syntax, e.g. 'json', 'xml', 'GLIF 1.0'.",
+      "properties": {
+        "value":     { "type": "string", "description": "The parsable string content." },
+        "formalism": { "type": "string", "description": "Name of the formalism, e.g. 'json', 'xml', 'HL7:PIVL'." }
+      },
+      "required": ["value", "formalism"]
+    },
+
+    "DV_URI": {
+      "extends": "DATA_VALUE",
+      "description": "A reference to an object conforming to RFC-3986 URI syntax. Plain-text URIs (with unencoded characters) are allowed for readability but must be encoded before use in machine contexts.",
+      "properties": {
+        "value": { "type": "string", "description": "URI string value." }
+      },
+      "required": ["value"]
+    },
+
+    "DV_EHR_URI": {
+      "extends": "DV_URI",
+      "description": "A DV_URI with scheme 'ehr', used to reference items within openEHR EHRs. Syntax: ehr://system_id/ehr_id/... or ehr:/ehr_id/..."
+    }
+
+  }
+}

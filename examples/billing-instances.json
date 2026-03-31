@@ -1,0 +1,113 @@
+{
+  "valid": [
+    {
+      "_comment": "Invoice references imported types from core schema",
+      "_type": "Invoice",
+      "id": "inv-001",
+      "createdAt": "2026-03-31",
+      "invoiceNumber": "INV-2026-0001",
+      "issuer": {
+        "_type": "Organization",
+        "id": "org-001",
+        "name": "Acme Corp",
+        "taxId": "TAX-123"
+      },
+      "recipient": {
+        "_type": "Person",
+        "id": "person-001",
+        "fullName": "Alice Smith",
+        "email": "alice@example.org"
+      },
+      "amount": 1500.75,
+      "currency": "USD"
+    },
+    {
+      "_comment": "Payment embeds local Invoice and imported Organization",
+      "_type": "Payment",
+      "id": "pay-001",
+      "createdAt": "2026-03-31",
+      "paymentId": "PAY-2026-001",
+      "invoice": {
+        "_type": "Invoice",
+        "id": "inv-002",
+        "createdAt": "2026-03-31",
+        "invoiceNumber": "INV-2026-0002",
+        "issuer": {
+          "_type": "Organization",
+          "id": "org-002",
+          "name": "Globex",
+          "taxId": "TAX-999"
+        },
+        "recipient": {
+          "_type": "Person",
+          "id": "person-002",
+          "fullName": "Bob Doe"
+        },
+        "amount": 900,
+        "currency": "EUR"
+      },
+      "processor": {
+        "_type": "Organization",
+        "id": "org-003",
+        "name": "PayFlow",
+        "taxId": "TAX-777"
+      },
+      "paidAmount": 900
+    }
+  ],
+  "invalid": [
+    {
+      "_comment": "issuer must be Organization, not Person",
+      "_type": "Invoice",
+      "id": "inv-bad-001",
+      "createdAt": "2026-03-31",
+      "invoiceNumber": "INV-BAD-001",
+      "issuer": {
+        "_type": "Person",
+        "id": "person-x",
+        "fullName": "Wrong Issuer"
+      },
+      "recipient": {
+        "_type": "Person",
+        "id": "person-y",
+        "fullName": "Valid Recipient"
+      },
+      "amount": 100,
+      "currency": "USD"
+    },
+    {
+      "_comment": "missing required imported reference recipient",
+      "_type": "Invoice",
+      "id": "inv-bad-002",
+      "createdAt": "2026-03-31",
+      "invoiceNumber": "INV-BAD-002",
+      "issuer": {
+        "_type": "Organization",
+        "id": "org-x",
+        "name": "Acme",
+        "taxId": "TAX-1"
+      },
+      "amount": 100,
+      "currency": "USD"
+    },
+    {
+      "_comment": "unknown import-side type in recipient object",
+      "_type": "Invoice",
+      "id": "inv-bad-003",
+      "createdAt": "2026-03-31",
+      "invoiceNumber": "INV-BAD-003",
+      "issuer": {
+        "_type": "Organization",
+        "id": "org-z",
+        "name": "Acme",
+        "taxId": "TAX-2"
+      },
+      "recipient": {
+        "_type": "UnknownPerson",
+        "id": "x"
+      },
+      "amount": 100,
+      "currency": "USD"
+    }
+  ]
+}

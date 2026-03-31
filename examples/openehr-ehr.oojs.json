@@ -1,0 +1,253 @@
+{
+  "$oojs": "1.0",
+  "$id": "https://specifications.openehr.org/schemas/oojs/rm/ehr",
+  "title": "openEHR EHR Information Model",
+  "description": "OOJS representation of the openEHR RM EHR specification (RM Release 1.1.0). Covers the ehr, composition, content, navigation, and entry packages.",
+  "discriminator": "_type",
+  "imports": {
+    "bt":  "https://specifications.openehr.org/schemas/oojs/base/base_types",
+    "dt":  "https://specifications.openehr.org/schemas/oojs/rm/data_types",
+    "ds":  "https://specifications.openehr.org/schemas/oojs/rm/data_structures",
+    "cm":  "https://specifications.openehr.org/schemas/oojs/rm/common"
+  },
+  "types": {
+
+    "ACCESS_CONTROL_SETTINGS": {
+      "abstract": true,
+      "description": "Abstract base for EHR access control policy objects. Concrete subtypes define specific access control schemes. The scheme name is derived from the concrete subtype in use."
+    },
+
+    "EHR_ACCESS": {
+      "extends": "cm.LOCATABLE",
+      "description": "EHR-wide access control object. All access decisions to data in the EHR must be made in accordance with the policies and rules in this object. Must be an archetype root point.",
+      "properties": {
+        "settings": { "type": "ACCESS_CONTROL_SETTINGS", "description": "Optional access control settings; the concrete subtype determines the scheme in use." }
+      }
+    },
+
+    "EHR_STATUS": {
+      "extends": "cm.LOCATABLE",
+      "description": "Single object per EHR holding EHR-wide status flags: whether the EHR is queryable, modifiable, and who the subject is. Always modifiable. Must be an archetype root point.",
+      "properties": {
+        "subject":        { "type": "cm.PARTY_SELF",      "description": "The subject of this EHR. external_ref may point to a demographic service entry." },
+        "is_queryable":   { "type": "boolean",            "description": "True if this EHR should be included in population queries." },
+        "is_modifiable":  { "type": "boolean",            "description": "True if the EHR (other than EHR_STATUS itself) may be written to." },
+        "other_details":  { "type": "ds.ITEM_STRUCTURE",  "description": "Optional archetyped additional details about this EHR." }
+      },
+      "required": ["subject", "is_queryable", "is_modifiable"]
+    },
+
+    "VERSIONED_EHR_ACCESS": {
+      "extends": "cm.VERSIONED_OBJECT",
+      "description": "Version container for EHR_ACCESS instances. Inherits uid, owner_id, and time_created from VERSIONED_OBJECT."
+    },
+
+    "VERSIONED_EHR_STATUS": {
+      "extends": "cm.VERSIONED_OBJECT",
+      "description": "Version container for EHR_STATUS instances. Inherits uid, owner_id, and time_created from VERSIONED_OBJECT."
+    },
+
+    "VERSIONED_COMPOSITION": {
+      "extends": "cm.VERSIONED_OBJECT",
+      "description": "Version container for COMPOSITION instances. All versions must share the same archetype_node_id and persistence category. Inherits uid, owner_id, and time_created from VERSIONED_OBJECT."
+    },
+
+    "EHR": {
+      "description": "Root object and access point of an EHR for a subject of care. Holds references to the EHR_STATUS, EHR_ACCESS, all versioned compositions, and optional folder structures.",
+      "properties": {
+        "system_id":     { "type": "bt.HIER_OBJECT_ID", "description": "Identifier of the logical EHR management system in which this EHR was created." },
+        "ehr_id":        { "type": "bt.HIER_OBJECT_ID", "description": "Unique identifier of this EHR. A UUID is strongly recommended." },
+        "time_created":  { "type": "dt.DV_DATE_TIME",   "description": "Time of creation of the EHR." },
+        "ehr_status":    { "type": "bt.OBJECT_REF",     "description": "Reference to the VERSIONED_EHR_STATUS for this EHR." },
+        "ehr_access":    { "type": "bt.OBJECT_REF",     "description": "Reference to the VERSIONED_EHR_ACCESS for this EHR." },
+        "contributions": {
+          "type": "array", "items": { "type": "bt.OBJECT_REF" },
+          "description": "Optional list of references to CONTRIBUTIONs that have caused changes to this EHR."
+        },
+        "compositions": {
+          "type": "array", "items": { "type": "bt.OBJECT_REF" },
+          "description": "Optional master list of references to all VERSIONED_COMPOSITIONs in this EHR."
+        },
+        "directory": { "type": "bt.OBJECT_REF", "description": "Optional reference to the first (primary) VERSIONED_FOLDER for this EHR." },
+        "folders": {
+          "type": "array", "items": { "type": "bt.OBJECT_REF" },
+          "description": "Optional list of references to all VERSIONED_FOLDERs for this EHR. When present, directory refers to the first member."
+        }
+      },
+      "required": ["system_id", "ehr_id", "time_created", "ehr_status", "ehr_access"]
+    },
+
+    "EVENT_CONTEXT": {
+      "extends": "cm.PATHABLE",
+      "description": "Context information for the healthcare event that caused a Composition to be created or modified. Records the start/end time of the clinical session, physical location, care setting, optional facility, and optional participations.",
+      "properties": {
+        "start_time":          { "type": "dt.DV_DATE_TIME",   "description": "Start time of the clinical session or healthcare event." },
+        "end_time":            { "type": "dt.DV_DATE_TIME",   "description": "Optional end time of the clinical session." },
+        "location":            { "type": "string",            "description": "Optional physical location of the session, e.g. 'bed 5, ward E', 'home'." },
+        "setting":             { "type": "dt.DV_CODED_TEXT",  "description": "Setting of the clinical session, coded from openEHR terminology group 'setting'." },
+        "health_care_facility":{ "type": "cm.PARTY_IDENTIFIED","description": "Optional health care facility under whose care the event took place." },
+        "other_context":       { "type": "ds.ITEM_STRUCTURE", "description": "Optional archetyped additional context." },
+        "participations": {
+          "type": "array", "items": { "type": "cm.PARTICIPATION" }, "minItems": 1,
+          "description": "Optional parties involved in the healthcare event."
+        }
+      },
+      "required": ["start_time", "setting"]
+    },
+
+    "CONTENT_ITEM": {
+      "extends": "cm.LOCATABLE",
+      "abstract": true,
+      "description": "Abstract ancestor of all concrete content types in a Composition: SECTIONs and all ENTRY subtypes."
+    },
+
+    "COMPOSITION": {
+      "extends": "cm.LOCATABLE",
+      "description": "The unit of modification, transmission, and attestation in the openEHR EHR. Equivalent to a signed clinical document. Must be an archetype root point. The uid should be copied from the enclosing VERSION.uid.",
+      "properties": {
+        "language":  { "type": "dt.CODE_PHRASE",    "description": "Language of this Composition, coded from openEHR Code Set 'languages'." },
+        "territory": { "type": "dt.CODE_PHRASE",    "description": "Territory in which this Composition was written, coded from openEHR Code Set 'countries' (ISO 3166)." },
+        "category":  { "type": "dt.DV_CODED_TEXT",  "description": "Temporal category: 431|persistent|, 451|episodic|, or 433|event|. Coded from openEHR terminology group 'composition_category'." },
+        "composer":  { "type": "cm.PARTY_PROXY",    "description": "Person primarily responsible for the content. Use PARTY_SELF for patient-entered data." },
+        "context":   { "type": "EVENT_CONTEXT",     "description": "Optional clinical session context for this Composition." },
+        "content": {
+          "type": "array", "items": { "type": "CONTENT_ITEM" }, "minItems": 1,
+          "description": "Optional content of this Composition: SECTIONs and/or ENTRYs."
+        }
+      },
+      "required": ["language", "territory", "category", "composer"]
+    },
+
+    "SECTION": {
+      "extends": "CONTENT_ITEM",
+      "description": "A heading in a section tree, providing logical and navigational structure within a Composition. Archetyped for specific heading structures such as SOAP or physical examination. Should not be used instead of ENTRY hierarchical structures.",
+      "properties": {
+        "items": {
+          "type": "array", "items": { "type": "CONTENT_ITEM" }, "minItems": 1,
+          "description": "Ordered content items under this section: further SECTIONs and/or ENTRYs."
+        }
+      }
+    },
+
+    "ENTRY": {
+      "extends": "CONTENT_ITEM",
+      "abstract": true,
+      "description": "Abstract root of all ENTRY subtypes. The minimal unit of hard clinical information in the EHR. Every Entry records its language, character encoding, subject, and optional provider and participations. Must be an archetype root point.",
+      "properties": {
+        "language":  { "type": "dt.CODE_PHRASE", "description": "Language of this Entry, coded from openEHR Code Set 'languages'." },
+        "encoding":  { "type": "dt.CODE_PHRASE", "description": "Character encoding of text values in this Entry, coded from openEHR Code Set 'character sets'." },
+        "subject":   { "type": "cm.PARTY_PROXY", "description": "Subject of this Entry. Use PARTY_SELF when the Entry is about the record subject." },
+        "provider":  { "type": "cm.PARTY_PROXY", "description": "Optional provider of the information in this Entry." },
+        "workflow_id":{ "type": "bt.OBJECT_REF", "description": "Optional reference to externally held workflow engine data for this workflow execution." },
+        "other_participations": {
+          "type": "array", "items": { "type": "cm.PARTICIPATION" }, "minItems": 1,
+          "description": "Optional other participations at Entry level."
+        }
+      },
+      "required": ["language", "encoding", "subject"]
+    },
+
+    "ADMIN_ENTRY": {
+      "extends": "ENTRY",
+      "description": "Entry subtype for administrative information about the clinical process: admissions, episodes, ward locations, discharges, appointments. Not for clinically significant information.",
+      "properties": {
+        "data": { "type": "ds.ITEM_STRUCTURE", "description": "Content of the administrative entry, modelled in archetypes." }
+      },
+      "required": ["data"]
+    },
+
+    "CARE_ENTRY": {
+      "extends": "ENTRY",
+      "abstract": true,
+      "description": "Abstract parent of all clinical ENTRY subtypes. Adds protocol (how the information was obtained) and optional guideline_id to the base ENTRY attributes.",
+      "properties": {
+        "protocol":     { "type": "ds.ITEM_STRUCTURE", "description": "Optional description of the method used to arrive at this Entry, e.g. clinical protocol, instrument, guideline reference." },
+        "guideline_id": { "type": "bt.OBJECT_REF",     "description": "Optional reference to an external guideline that generated this Entry." }
+      }
+    },
+
+    "OBSERVATION": {
+      "extends": "CARE_ENTRY",
+      "description": "Entry subtype for all clinical data about past or present phenomena: measurements, pathology results, patient-reported symptoms, physical examination findings. Data is expressed as a HISTORY of EVENTs. Not for opinions or future statements.",
+      "properties": {
+        "data":  { "type": "ds.HISTORY", "description": "The observation data as a history of events, each of which may be a complex ITEM_STRUCTURE." },
+        "state": { "type": "ds.HISTORY", "description": "Optional separate history of subject state during the observation, e.g. exertion level, position, fasting status." }
+      },
+      "required": ["data"]
+    },
+
+    "EVALUATION": {
+      "extends": "CARE_ENTRY",
+      "description": "Entry subtype for evaluation statements: diagnoses, differential diagnoses, risk assessments, goals, plans, clinical synopses. Not for actionable orders — use INSTRUCTION for those.",
+      "properties": {
+        "data": { "type": "ds.ITEM_STRUCTURE", "description": "The evaluation data as an archetyped spatial structure." }
+      },
+      "required": ["data"]
+    },
+
+    "ACTIVITY": {
+      "extends": "cm.LOCATABLE",
+      "description": "A single activity within an INSTRUCTION, such as a medication administration. Carries an optional timing specification, a mandatory action archetype pattern, and a mandatory archetyped description.",
+      "properties": {
+        "timing":              { "type": "dt.DV_PARSABLE", "description": "Optional timing in parsable form. Preferred syntax is ISO 8601 'R' format; HL7 GTS is also supported." },
+        "action_archetype_id": { "type": "string",         "description": "Perl-compatible regex pattern (enclosed in '//' delimiters) identifying valid ACTION archetypes for this Activity. Defaults to /.*/ (any archetype)." },
+        "description":         { "type": "ds.ITEM_STRUCTURE", "description": "Archetyped description of the activity." }
+      },
+      "required": ["action_archetype_id", "description"]
+    },
+
+    "INSTRUCTION": {
+      "extends": "CARE_ENTRY",
+      "description": "Entry subtype for specifying future actions: medication orders, therapeutic orders, monitoring, recall, review. Must include enough detail for direct execution by a human or machine actor.",
+      "properties": {
+        "narrative":    { "type": "dt.DV_TEXT",     "description": "Mandatory human-readable description of what the Instruction is about." },
+        "expiry_time":  { "type": "dt.DV_DATE_TIME","description": "Optional expiry date/time after which the Instruction can be assumed to have expired." },
+        "wf_definition":{ "type": "dt.DV_PARSABLE", "description": "Optional formal workflow engine expression of the Instruction." },
+        "activities": {
+          "type": "array", "items": { "type": "ACTIVITY" }, "minItems": 1,
+          "description": "Optional list of activities comprising this Instruction."
+        }
+      },
+      "required": ["narrative"]
+    },
+
+    "ISM_TRANSITION": {
+      "extends": "cm.PATHABLE",
+      "description": "Model of a transition in the Instruction State Machine (ISM) caused by a careflow step. Records the current ISM state, the transition that occurred, the careflow step label, and optional reasons.",
+      "properties": {
+        "current_state":  { "type": "dt.DV_CODED_TEXT", "description": "Current ISM state, coded from openEHR terminology group 'Instruction states', e.g. 526|planned|, 245|active|, 530|completed|." },
+        "transition":     { "type": "dt.DV_CODED_TEXT", "description": "Optional ISM transition that occurred, coded from openEHR terminology group 'Instruction transitions'." },
+        "careflow_step":  { "type": "dt.DV_CODED_TEXT", "description": "Optional clinical label for the careflow step, e.g. 'dispense', 'start_administration'. Defined in the ACTION archetype." },
+        "reason": {
+          "type": "array", "items": { "type": "dt.DV_TEXT" }, "minItems": 1,
+          "description": "Optional reasons for this careflow step having been taken."
+        }
+      },
+      "required": ["current_state"]
+    },
+
+    "INSTRUCTION_DETAILS": {
+      "extends": "cm.PATHABLE",
+      "description": "Details of the INSTRUCTION that caused an ACTION to be performed. Records a reference to the Instruction, the Activity path within it, and optional workflow engine state.",
+      "properties": {
+        "instruction_id": { "type": "bt.LOCATABLE_REF",  "description": "Reference to the causing INSTRUCTION." },
+        "activity_id":    { "type": "string",             "description": "Archetype path identifying the Activity within the Instruction." },
+        "wf_details":     { "type": "ds.ITEM_STRUCTURE",  "description": "Optional workflow engine state details, e.g. fired conditions, notifications." }
+      },
+      "required": ["instruction_id", "activity_id"]
+    },
+
+    "ACTION": {
+      "extends": "CARE_ENTRY",
+      "description": "Entry subtype for recording a clinical action that has been performed, whether ad hoc or in response to an INSTRUCTION. Every Action corresponds to a careflow step and records an ISM transition.",
+      "properties": {
+        "time":                { "type": "dt.DV_DATE_TIME",    "description": "Point in time at which this action completed." },
+        "ism_transition":      { "type": "ISM_TRANSITION",     "description": "ISM transition caused by this Action." },
+        "instruction_details": { "type": "INSTRUCTION_DETAILS","description": "Optional details of the Instruction that caused this Action." },
+        "description":         { "type": "ds.ITEM_STRUCTURE",  "description": "Archetyped description of the action performed." }
+      },
+      "required": ["time", "ism_transition", "description"]
+    }
+
+  }
+}

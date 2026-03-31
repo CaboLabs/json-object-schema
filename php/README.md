@@ -51,6 +51,37 @@ if ($errors) {
 }
 ```
 
+## Cross-Schema Imports Example
+
+OOJS supports alias-qualified references between schemas (`imports` + `alias.TypeName`).
+The repository includes a complete example in `examples/`:
+
+- `examples/core.oojs.json` (base schema)
+- `examples/billing.oojs.json` (imports `core`)
+- `examples/billing-instances.json` (valid/invalid instances)
+
+```php
+<?php
+
+use Oojs\Registry;
+use function Oojs\validate;
+
+$registry = new Registry();
+$registry->loadFile(__DIR__ . '/../examples/core.oojs.json');
+$billing = $registry->loadFile(__DIR__ . '/../examples/billing.oojs.json');
+
+$data = json_decode(
+    file_get_contents(__DIR__ . '/../examples/billing-instances.json'),
+    true,
+    flags: JSON_THROW_ON_ERROR,
+);
+
+$invoice = $data['valid'][0];
+unset($invoice['_comment']); // fixture metadata
+
+$errors = validate($invoice, $billing->types['Invoice'], $billing, $registry);
+```
+
 ## API
 
 ### `Registry`

@@ -1,0 +1,153 @@
+{
+  "$oojs": "1.0",
+  "$id": "https://specifications.openehr.org/schemas/oojs/base/base_types",
+  "title": "openEHR Base Types",
+  "description": "OOJS representation of the openEHR BASE base_types specification (BASE Release 1.2.0). Covers the definitions, builtins, and identification packages.",
+  "discriminator": "_type",
+  "types": {
+
+    "BASIC_DEFINITIONS": {
+      "description": "Defines globally used constant values: CR, LF, Default_encoding (UTF-8), Any_type_name, None_type_name, Regex_any_pattern."
+    },
+
+    "OPENEHR_DEFINITIONS": {
+      "extends": "BASIC_DEFINITIONS",
+      "description": "Inheritance class providing access to constants defined in other packages. Adds Local_terminology_id = 'local'."
+    },
+
+    "VALIDITY_KIND": {
+      "description": "Enumeration of three constraint-model values: mandatory, optional, prohibited. Used as the type of attributes that express presence constraints on reference model attributes.",
+      "properties": {
+        "value": {
+          "type": "string",
+          "enum": ["mandatory", "optional", "prohibited"],
+          "description": "One of: mandatory, optional, prohibited."
+        }
+      },
+      "required": ["value"]
+    },
+
+    "VERSION_STATUS": {
+      "description": "Status of a versioned artefact: alpha, beta, release_candidate, released, build.",
+      "properties": {
+        "value": {
+          "type": "string",
+          "enum": ["alpha", "beta", "release_candidate", "released", "build"],
+          "description": "One of: alpha, beta, release_candidate, released, build."
+        }
+      },
+      "required": ["value"]
+    },
+
+    "UID": {
+      "abstract": true,
+      "description": "Abstract parent of classes representing unique identifiers that durably identify a single information entity and are never re-used. All subtypes carry their value as a single string.",
+      "properties": {
+        "value": { "type": "string", "description": "The string value of the identifier." }
+      },
+      "required": ["value"]
+    },
+
+    "ISO_OID": {
+      "extends": "UID",
+      "description": "ISO/IEC 8824 Object Identifier. Dot-separated integers where each non-leaf node identifies an assigning authority's namespace. Example: '2.16.840.1.113883'."
+    },
+
+    "UUID": {
+      "extends": "UID",
+      "description": "DCE Universal Unique Identifier (also known as GUID). Hexadecimal integers separated by hyphens in the pattern 8-4-4-4-12. Example: '87284370-2D4B-4e3d-A3F3-F303D2F4F34B'."
+    },
+
+    "INTERNET_ID": {
+      "extends": "UID",
+      "description": "Reverse internet domain identifier as specified by IETF RFC 1034. Dot-separated labels in reverse domain order. Example: 'uk.nhs.ehr1'."
+    },
+
+    "OBJECT_ID": {
+      "abstract": true,
+      "description": "Abstract ancestor of all identifiers of informational objects. Used inside an object to identify that object (analogous to a database primary key). To reference another object use OBJECT_REF.",
+      "properties": {
+        "value": { "type": "string", "description": "The string value of the identifier in the form defined by the concrete subtype." }
+      },
+      "required": ["value"]
+    },
+
+    "UID_BASED_ID": {
+      "extends": "OBJECT_ID",
+      "abstract": true,
+      "description": "Abstract UID-based identifier with an optional extension. Lexical form: root '::' extension, where root is a UID and extension is any string. The root identifies the conceptual namespace; the extension provides local disambiguation within that namespace."
+    },
+
+    "HIER_OBJECT_ID": {
+      "extends": "UID_BASED_ID",
+      "description": "Concrete UID-based hierarchical identifier. Used to identify non-versioned objects. Example: '87284370-2D4B-4e3d-A3F3-F303D2F4F34B' or '87284370-2D4B-4e3d-A3F3-F303D2F4F34B::local'."
+    },
+
+    "VERSION_TREE_ID": {
+      "description": "Version tree identifier for one version within a versioned container. Lexical form: trunk_version ['.' branch_number '.' branch_version]. Trunk numbering starts at 1. Example: '1', '2', '2.1.3'.",
+      "properties": {
+        "value": { "type": "string", "description": "String form of the version tree identifier." }
+      },
+      "required": ["value"]
+    },
+
+    "OBJECT_VERSION_ID": {
+      "extends": "UID_BASED_ID",
+      "description": "Globally unique identifier for one version of a versioned object. Lexical form: object_id '::' creating_system_id '::' version_tree_id. Example: '87284370-2D4B-4e3d-A3F3-F303D2F4F34B::uk.nhs.ehr1::2'."
+    },
+
+    "ARCHETYPE_ID": {
+      "extends": "OBJECT_ID",
+      "description": "Multi-axial identifier for archetypes. Lexical form: rm_originator '-' rm_name '-' rm_entity '.' concept_name {'-' specialisation}* '.v' number. Example: 'openEHR-EHR-OBSERVATION.blood_pressure.v1'."
+    },
+
+    "TEMPLATE_ID": {
+      "extends": "OBJECT_ID",
+      "description": "Identifier for templates. Lexical form to be determined by the openEHR specification."
+    },
+
+    "TERMINOLOGY_ID": {
+      "extends": "OBJECT_ID",
+      "description": "Identifier for a terminology accessed via a terminology query service. Lexical form: name ['(' version ')']. Examples: 'SNOMED-CT', 'ICD10AM(3rd_ed)', 'local'."
+    },
+
+    "GENERIC_ID": {
+      "extends": "OBJECT_ID",
+      "description": "Generic identifier for schemes not otherwise defined in openEHR. Carries a scheme name alongside the inherited value.",
+      "properties": {
+        "scheme": { "type": "string", "description": "Name of the identification scheme to which this identifier conforms." }
+      },
+      "required": ["scheme"]
+    },
+
+    "OBJECT_REF": {
+      "description": "A reference to another object that may exist locally or in an external namespace or service. Analogous to a database foreign key. Carries a namespace, a type name, and an OBJECT_ID.",
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "description": "Namespace in which the referenced object exists, e.g. 'local', 'unknown', 'demographic', 'terminology'. Legal values: 'local', 'unknown', or a string matching [a-zA-Z][a-zA-Z0-9_.:/?=+-]*."
+        },
+        "type": {
+          "type": "string",
+          "description": "Name of the class (concrete or abstract) of the referenced object, e.g. 'PARTY', 'COMPOSITION', 'VERSIONED_COMPOSITION'. Use 'ANY' if the type is unknown."
+        },
+        "id": { "type": "OBJECT_ID", "description": "Globally unique identifier of the referenced object." }
+      },
+      "required": ["namespace", "type", "id"]
+    },
+
+    "PARTY_REF": {
+      "extends": "OBJECT_REF",
+      "description": "Reference to a party in a demographic or identity service. The type attribute is constrained to one of: PERSON, ORGANISATION, GROUP, AGENT, ROLE, PARTY, ACTOR."
+    },
+
+    "LOCATABLE_REF": {
+      "extends": "OBJECT_REF",
+      "description": "Reference to a LOCATABLE instance inside the top-level content of a VERSION. The id must be a UID_BASED_ID; the optional path is an absolute openEHR path applied to the object at VERSION.data.",
+      "properties": {
+        "path": { "type": "string", "description": "Optional absolute path to the target instance within the versioned object. Absent means the root of the versioned object." }
+      }
+    }
+
+  }
+}

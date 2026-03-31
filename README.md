@@ -93,6 +93,9 @@ spec/                      Phase 4: Formal specification (in progress)
 examples/
   clinical.oojs.json       Example schema (clinical domain)
   clinical-instances.json  Valid and invalid instance examples
+  core.oojs.json           Base schema for cross-schema imports
+  billing.oojs.json        Schema importing `core` via alias-qualified types
+  billing-instances.json   Valid and invalid instances for the cross-schema example
 ```
 
 ## Roadmap

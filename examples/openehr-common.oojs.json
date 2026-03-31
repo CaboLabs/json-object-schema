@@ -1,0 +1,332 @@
+{
+  "$oojs": "1.0",
+  "$id": "https://specifications.openehr.org/schemas/oojs/rm/common",
+  "title": "openEHR Common Information Model",
+  "description": "OOJS representation of the openEHR RM common specification (RM Release 1.1.0). Covers the archetyped, generic, directory, change_control, and resource packages.",
+  "discriminator": "_type",
+  "imports": {
+    "bt": "https://specifications.openehr.org/schemas/oojs/base/base_types",
+    "dt": "https://specifications.openehr.org/schemas/oojs/rm/data_types",
+    "ds": "https://specifications.openehr.org/schemas/oojs/rm/data_structures"
+  },
+  "types": {
+
+    "PATHABLE": {
+      "abstract": true,
+      "description": "Defines path-navigation capabilities used by nearly all classes in the openEHR RM via inheritance of LOCATABLE. PATHABLE objects can locate child objects using openEHR paths and know their parent in a compositional hierarchy. All functions (item_at_path, items_at_path, path_exists, path_unique, path_of_item) are behavioural and carry no stored attributes."
+    },
+
+    "ARCHETYPED": {
+      "description": "Archetype identification metadata attached to archetype root points in data. Records the generating archetype_id, optional template_id, and the RM version used to create the object.",
+      "properties": {
+        "archetype_id": { "type": "bt.ARCHETYPE_ID", "description": "Globally unique archetype identifier." },
+        "template_id":  { "type": "bt.TEMPLATE_ID",  "description": "Optional globally unique template identifier active at this point in the structure." },
+        "rm_version":   { "type": "string",           "description": "Version of the openEHR RM used to create this object, e.g. '1.1.0'." }
+      },
+      "required": ["archetype_id", "rm_version"]
+    },
+
+    "LINK": {
+      "description": "A typed, directed logical relationship between two archetyped structures. Links may cross composition and EHR boundaries. The meaning describes the clinical relationship; type gives a domain-level category; target is the referenced object.",
+      "properties": {
+        "meaning": { "type": "dt.DV_TEXT",    "description": "Clinical description of the relationship, e.g. 'in response to', 'follow-up to'." },
+        "type":    { "type": "dt.DV_TEXT",    "description": "Domain-level type of the link, e.g. 'problem', 'issue'." },
+        "target":  { "type": "dt.DV_EHR_URI", "description": "The target object of the link relation." }
+      },
+      "required": ["meaning", "type", "target"]
+    },
+
+    "FEEDER_AUDIT_DETAILS": {
+      "description": "Audit details for one system in a feeder chain: the system identifier, optional location, subject, provider, handling time, version identifier, and any custom meta-data.",
+      "properties": {
+        "system_id":     { "type": "string",              "description": "Identifier of the system that handled the item." },
+        "location":      { "type": "PARTY_IDENTIFIED",    "description": "Optional site or facility within the organisation that handled the item." },
+        "subject":       { "type": "PARTY_PROXY",         "description": "Optional identifiers for the subject of the received item." },
+        "provider":      { "type": "PARTY_IDENTIFIED",    "description": "Optional provider who created, committed, or forwarded the item." },
+        "time":          { "type": "dt.DV_DATE_TIME",     "description": "Optional time of handling the item." },
+        "version_id":    { "type": "string",              "description": "Optional version identifier used in the source system, e.g. 'interim', 'final'." },
+        "other_details": { "type": "ds.ITEM_STRUCTURE",   "description": "Optional custom meta-data, may be archetyped." }
+      },
+      "required": ["system_id"]
+    },
+
+    "FEEDER_AUDIT": {
+      "description": "Audit trail describing the origin of data transformed into openEHR form from a feeder or legacy system. Records identifiers from the originating and feeder systems, optional original content, and mandatory originating-system audit details.",
+      "properties": {
+        "originating_system_item_ids": {
+          "type": "array", "items": { "type": "dt.DV_IDENTIFIER" },
+          "description": "Identifiers for the item in the originating system, e.g. filler and placer ids."
+        },
+        "feeder_system_item_ids": {
+          "type": "array", "items": { "type": "dt.DV_IDENTIFIER" },
+          "description": "Identifiers for the item in the feeder system, where distinct from the originating system."
+        },
+        "original_content":         { "type": "dt.DV_ENCAPSULATED",   "description": "Optional inline or referenced original content corresponding to the openEHR content at this node." },
+        "originating_system_audit": { "type": "FEEDER_AUDIT_DETAILS", "description": "Audit information from the originating system." },
+        "feeder_system_audit":      { "type": "FEEDER_AUDIT_DETAILS", "description": "Optional audit information from the feeder system, if distinct from the originating system." }
+      },
+      "required": ["originating_system_audit"]
+    },
+
+    "LOCATABLE": {
+      "extends": "PATHABLE",
+      "abstract": true,
+      "description": "Root of all information model classes that can be archetyped and path-addressed. Carries a runtime name, a design-time archetype_node_id, and optional uid, links, archetype_details, and feeder_audit.",
+      "properties": {
+        "name":              { "type": "dt.DV_TEXT",  "description": "Runtime name of this node, used to build runtime paths." },
+        "archetype_node_id": { "type": "string",      "description": "Design-time archetype node identifier, e.g. 'at0005'. At archetype root points this is the stringified archetype_id." },
+        "uid":               { "type": "bt.UID_BASED_ID", "description": "Optional globally unique identifier; recommended for archetype root points." },
+        "links": {
+          "type": "array", "items": { "type": "LINK" }, "minItems": 1,
+          "description": "Optional links to other archetyped structures."
+        },
+        "archetype_details": { "type": "ARCHETYPED",   "description": "Archetype identification metadata; present only at archetype root points." },
+        "feeder_audit":      { "type": "FEEDER_AUDIT", "description": "Optional audit trail from a feeder or legacy system." }
+      },
+      "required": ["name", "archetype_node_id"]
+    },
+
+    "PARTY_PROXY": {
+      "abstract": true,
+      "description": "Abstract proxy description of a party, with an optional reference to fuller demographic data in an external service. Subtypes are PARTY_SELF (the subject of the record) and PARTY_IDENTIFIED (any other party).",
+      "properties": {
+        "external_ref": { "type": "bt.PARTY_REF", "description": "Optional reference to demographic or identity management data for this party in an external system." }
+      }
+    },
+
+    "PARTY_SELF": {
+      "extends": "PARTY_PROXY",
+      "description": "Party proxy representing the subject of the record. Used wherever the record owner must be referenced. May or may not have external_ref set."
+    },
+
+    "PARTY_IDENTIFIED": {
+      "extends": "PARTY_PROXY",
+      "description": "Proxy for an identified party other than the subject of the record. At least one of name, identifiers, or external_ref must be present. Used for health care providers and other participants.",
+      "properties": {
+        "name": { "type": "string", "description": "Optional human-readable name." },
+        "identifiers": {
+          "type": "array", "items": { "type": "dt.DV_IDENTIFIER" }, "minItems": 1,
+          "description": "Optional list of formal identifiers, e.g. NHS number, provider number."
+        }
+      }
+    },
+
+    "PARTY_RELATED": {
+      "extends": "PARTY_IDENTIFIED",
+      "description": "Proxy for a party whose relationship to the subject of the record is known and required, e.g. 'mother', 'donor'. The relationship is coded from the openEHR terminology group 'subject relationship'.",
+      "properties": {
+        "relationship": { "type": "dt.DV_CODED_TEXT", "description": "Relationship of this party to the subject of the record, coded from openEHR terminology group 'subject_relationship'." }
+      },
+      "required": ["relationship"]
+    },
+
+    "PARTICIPATION": {
+      "description": "Model of a party's participation in an activity, capturing the performer, their function, optional mode of interaction, and optional time interval of participation.",
+      "properties": {
+        "performer": { "type": "PARTY_PROXY",      "description": "The party participating in the activity." },
+        "function":  { "type": "dt.DV_TEXT",       "description": "The function of the party in this participation. Should be coded where possible." },
+        "mode":      { "type": "dt.DV_CODED_TEXT", "description": "Optional mode of interaction, e.g. 'present', 'by telephone', 'by email'. Coded from openEHR terminology group 'participation_mode'." },
+        "time":      { "type": "dt.DV_INTERVAL",   "description": "Optional time interval of the participation." }
+      },
+      "required": ["performer", "function"]
+    },
+
+    "AUDIT_DETAILS": {
+      "description": "The set of attributes documenting the committal of an information item to a repository: the system, committer, time, type of change, and optional description.",
+      "properties": {
+        "system_id":     { "type": "string",           "description": "Identifier of the logical EHR system where the change was committed." },
+        "committer":     { "type": "PARTY_PROXY",      "description": "Identity of the user who committed the item." },
+        "time_committed":{ "type": "dt.DV_DATE_TIME",  "description": "Time of committal." },
+        "change_type":   { "type": "dt.DV_CODED_TEXT", "description": "Type of change, coded from openEHR terminology group 'audit_change_type', e.g. 249|creation|, 250|amendment|, 251|modification|, 523|deleted|." },
+        "description":   { "type": "dt.DV_TEXT",       "description": "Optional reason for committal, qualifying the change_type." }
+      },
+      "required": ["system_id", "committer", "time_committed", "change_type"]
+    },
+
+    "ATTESTATION": {
+      "extends": "AUDIT_DETAILS",
+      "description": "An explicit signing by a healthcare agent of particular record content, for purposes such as authorisation, witnessing, or acknowledgement. Extends AUDIT_DETAILS with attested_view, proof, items, reason, and is_pending.",
+      "properties": {
+        "attested_view": { "type": "dt.DV_MULTIMEDIA", "description": "Optional visual representation of the content attested, e.g. a screen image." },
+        "proof":         { "type": "string",           "description": "Optional openPGP digital signature or digest of the attested content." },
+        "items": {
+          "type": "array", "items": { "type": "dt.DV_EHR_URI" }, "minItems": 1,
+          "description": "Optional list of runtime paths to specific items being attested. If absent, the entire VERSION is attested."
+        },
+        "reason":     { "type": "dt.DV_TEXT",  "description": "Reason for attestation, optionally coded from openEHR terminology group 'attestation_reason'." },
+        "is_pending": { "type": "boolean",     "description": "True if this attestation is outstanding (awaiting completion); False if completed." }
+      },
+      "required": ["reason", "is_pending"]
+    },
+
+    "REVISION_HISTORY_ITEM": {
+      "description": "One entry in a revision history, associating a version identifier with the list of audits (commits and attestations) that apply to that version.",
+      "properties": {
+        "version_id": { "type": "bt.OBJECT_VERSION_ID", "description": "Version identifier for this revision." },
+        "audits": {
+          "type": "array", "items": { "type": "AUDIT_DETAILS" }, "minItems": 1,
+          "description": "Audits for this revision; at least one commit audit, plus any subsequent attestations."
+        }
+      },
+      "required": ["version_id", "audits"]
+    },
+
+    "REVISION_HISTORY": {
+      "description": "Ordered list of REVISION_HISTORY_ITEMs representing the complete audit history of a versioned resource, in most-recent-last order.",
+      "properties": {
+        "items": {
+          "type": "array", "items": { "type": "REVISION_HISTORY_ITEM" }, "minItems": 1,
+          "description": "The revision history items in most-recent-last order."
+        }
+      },
+      "required": ["items"]
+    },
+
+    "FOLDER": {
+      "extends": "LOCATABLE",
+      "description": "A named folder that may contain references to versioned objects and/or sub-folders. Used to organise EHR content into directory-like structures. The uid of the root FOLDER should be copied from the enclosing VERSION.uid.",
+      "properties": {
+        "items": {
+          "type": "array", "items": { "type": "bt.OBJECT_REF" },
+          "description": "Optional references to versioned objects logically contained in this folder."
+        },
+        "folders": {
+          "type": "array", "items": { "type": "FOLDER" }, "minItems": 1,
+          "description": "Optional sub-folders."
+        },
+        "details": { "type": "ds.ITEM_STRUCTURE", "description": "Optional archetyped meta-data for this folder." }
+      }
+    },
+
+    "VERSIONED_FOLDER": {
+      "description": "A version-controlled hierarchy of FOLDERs, providing the effect of a versioned directory. Each version of the container holds a FOLDER tree. Inherits VERSIONED_OBJECT semantics.",
+      "properties": {
+        "uid":          { "type": "bt.HIER_OBJECT_ID", "description": "Unique identifier of this version container." },
+        "owner_id":     { "type": "bt.OBJECT_REF",     "description": "Reference to the owning object, e.g. the EHR." },
+        "time_created": { "type": "dt.DV_DATE_TIME",   "description": "Time of initial creation of this versioned object." }
+      },
+      "required": ["uid", "owner_id", "time_created"]
+    },
+
+    "VERSION": {
+      "abstract": true,
+      "description": "Abstract model of one version within a VERSIONED_OBJECT. Carries the contribution reference, optional digital signature, and commit audit. The uid, preceding_version_uid, data, and lifecycle_state are defined concretely in subtypes.",
+      "properties": {
+        "contribution":  { "type": "bt.OBJECT_REF",    "description": "Reference to the CONTRIBUTION in which this version was added." },
+        "commit_audit":  { "type": "AUDIT_DETAILS",    "description": "Audit trail for the committal of this version." },
+        "signature":     { "type": "string",           "description": "Optional openPGP digital signature or digest of the canonical form of this version." }
+      },
+      "required": ["contribution", "commit_audit"]
+    },
+
+    "ORIGINAL_VERSION": {
+      "extends": "VERSION",
+      "description": "A version containing locally created content. Stores its own uid and preceding_version_uid, lifecycle state, optional attestations, optional merge inputs, and the versioned data payload.",
+      "properties": {
+        "uid":                      { "type": "bt.OBJECT_VERSION_ID", "description": "Unique identifier of this version." },
+        "preceding_version_uid":    { "type": "bt.OBJECT_VERSION_ID", "description": "Identifier of the version from which this one was derived. Absent for the first version." },
+        "other_input_version_uids": {
+          "type": "array", "items": { "type": "bt.OBJECT_VERSION_ID" }, "minItems": 1,
+          "description": "Optional identifiers of other versions merged into this one."
+        },
+        "lifecycle_state": { "type": "dt.DV_CODED_TEXT", "description": "Lifecycle state of the content, coded from openEHR vocabulary 'version_lifecycle_state': 532|complete|, 553|incomplete|, 523|deleted|." },
+        "attestations": {
+          "type": "array", "items": { "type": "ATTESTATION" }, "minItems": 1,
+          "description": "Optional attestations associated with this version."
+        }
+      },
+      "required": ["uid", "lifecycle_state"]
+    },
+
+    "IMPORTED_VERSION": {
+      "extends": "VERSION",
+      "description": "A wrapper around an ORIGINAL_VERSION copied from another system. Provides its own contribution and commit_audit for the local import act, while preserving the original version's identity and content inside item.",
+      "properties": {
+        "item": { "type": "ORIGINAL_VERSION", "description": "The ORIGINAL_VERSION that was imported." }
+      },
+      "required": ["item"]
+    },
+
+    "VERSIONED_OBJECT": {
+      "description": "Version control abstraction for one complex object. Holds a unique uid (the virtual version tree id), a reference to the owning entity, and the creation time. All version access is via functions; the internal version collection is implementation-defined.",
+      "properties": {
+        "uid":          { "type": "bt.HIER_OBJECT_ID", "description": "Unique identifier of this version container; the same across all distributed copies." },
+        "owner_id":     { "type": "bt.OBJECT_REF",     "description": "Reference to the owning object, e.g. the EHR." },
+        "time_created": { "type": "dt.DV_DATE_TIME",   "description": "Time of initial creation of this versioned object." }
+      },
+      "required": ["uid", "owner_id", "time_created"]
+    },
+
+    "CONTRIBUTION": {
+      "description": "Documents a change-set (contribution) of one or more versions added to a change-controlled repository in a single logical commit. Carries a unique uid, the set of version references, and the commit audit.",
+      "properties": {
+        "uid": { "type": "bt.HIER_OBJECT_ID", "description": "Unique identifier for this contribution." },
+        "versions": {
+          "type": "array", "items": { "type": "bt.OBJECT_REF" }, "minItems": 1,
+          "description": "References to the versions added or modified in this contribution."
+        },
+        "audit": { "type": "AUDIT_DETAILS", "description": "Audit trail for the committal of this contribution." }
+      },
+      "required": ["uid", "versions", "audit"]
+    },
+
+    "TRANSLATION_DETAILS": {
+      "description": "Details of a natural language translation of an AUTHORED_RESOURCE, including the target language, translator identity, optional accreditation, and any other meta-data.",
+      "properties": {
+        "language":      { "type": "dt.CODE_PHRASE", "description": "Language of the translation, coded from openEHR Code Set 'languages'." },
+        "author":        { "type": "string",         "description": "Translator name and other demographic details, serialised as a string map." },
+        "accreditation": { "type": "string",         "description": "Optional accreditation of the translator, e.g. a national registration id." },
+        "other_details": { "type": "string",         "description": "Optional additional meta-data as a serialised string map." }
+      },
+      "required": ["language", "author"]
+    },
+
+    "RESOURCE_DESCRIPTION_ITEM": {
+      "description": "Language-specific descriptive meta-data for an AUTHORED_RESOURCE. One instance per language. Contains purpose, optional keywords, use, misuse, copyright, original resource URIs, and other language-sensitive details.",
+      "properties": {
+        "language":             { "type": "dt.CODE_PHRASE", "description": "Language of this description item, coded from openEHR Code Set 'languages'." },
+        "purpose":              { "type": "string",         "description": "Purpose of the resource." },
+        "keywords":             { "type": "array", "items": { "type": "string" }, "description": "Optional keywords for indexing and searching." },
+        "use":                  { "type": "string",         "description": "Optional description of appropriate use contexts." },
+        "misuse":               { "type": "string",         "description": "Optional description of contexts in which the resource should not be used." },
+        "copyright":            { "type": "string",         "description": "Optional copyright statement." },
+        "original_resource_uri":{ "type": "string",         "description": "Optional URIs of original clinical documents formalised by this resource, serialised as a string map keyed by meaning." },
+        "other_details":        { "type": "string",         "description": "Optional additional language-sensitive meta-data, serialised as a string map." }
+      },
+      "required": ["language", "purpose"]
+    },
+
+    "RESOURCE_DESCRIPTION": {
+      "description": "Descriptive meta-data of an AUTHORED_RESOURCE: original author, optional other contributors, lifecycle state, optional package URI, optional other details, and language-specific description items keyed by language code.",
+      "properties": {
+        "original_author":       { "type": "string",  "description": "Original author details serialised as a string map (name, organisation, email, date)." },
+        "other_contributors":    { "type": "array", "items": { "type": "string" }, "description": "Optional other contributors in 'name <email>' form." },
+        "lifecycle_state":       { "type": "string",  "description": "Lifecycle state of the resource, e.g. 'initial', 'submitted', 'approved', 'superseded', 'obsolete'." },
+        "resource_package_uri":  { "type": "string",  "description": "Optional URI of the package to which this resource belongs." },
+        "other_details":         { "type": "string",  "description": "Optional additional non-language-sensitive meta-data, serialised as a string map." },
+        "details": {
+          "type": "array", "items": { "type": "RESOURCE_DESCRIPTION_ITEM" }, "minItems": 1,
+          "description": "Language-specific description items; one per available language."
+        }
+      },
+      "required": ["original_author", "lifecycle_state", "details"]
+    },
+
+    "AUTHORED_RESOURCE": {
+      "abstract": true,
+      "description": "Abstract root of online resources created by a human author. Carries the original authoring language, optional translation details, optional descriptive meta-data, and optional revision history (required when is_controlled is true).",
+      "properties": {
+        "original_language": { "type": "dt.CODE_PHRASE",        "description": "Language in which this resource was originally authored, coded from openEHR Code Set 'languages'." },
+        "is_controlled":     { "type": "boolean",               "description": "True if this resource is under change control, in which case revision_history must be present." },
+        "description":       { "type": "RESOURCE_DESCRIPTION",  "description": "Optional descriptive meta-data and lifecycle information." },
+        "revision_history":  { "type": "REVISION_HISTORY",      "description": "Revision history; required when is_controlled is true." },
+        "translations": {
+          "type": "array", "items": { "type": "TRANSLATION_DETAILS" },
+          "description": "Optional translation details for each language other than the original; one entry per translated language."
+        }
+      },
+      "required": ["original_language"]
+    }
+
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "$oojs": "1.0",
+  "$id": "https://specifications.openehr.org/schemas/oojs/rm/demographic",
+  "title": "openEHR Demographic Information Model",
+  "description": "OOJS representation of the openEHR RM demographic specification (RM Release 1.0.3). Covers the single demographic package containing all party, role, identity, contact, address, capability, and actor types.",
+  "discriminator": "_type",
+  "imports": {
+    "bt": "https://specifications.openehr.org/schemas/oojs/base/base_types",
+    "dt": "https://specifications.openehr.org/schemas/oojs/rm/data_types",
+    "ds": "https://specifications.openehr.org/schemas/oojs/rm/data_structures",
+    "cm": "https://specifications.openehr.org/schemas/oojs/rm/common"
+  },
+  "types": {
+
+    "PARTY_IDENTITY": {
+      "extends": "cm.LOCATABLE",
+      "description": "An identity owned by a PARTY, such as a person's legal name, stage name, alias, or a company's trading name. The inherited name attribute carries the purpose of the identity (e.g. 'legal', 'nickname'). Actual structure is archetyped via details.",
+      "properties": {
+        "details": { "type": "ds.ITEM_STRUCTURE", "description": "The value of the identity, typically a parsable string or small structure of strings. Archetyped." }
+      },
+      "required": ["details"]
+    },
+
+    "ADDRESS": {
+      "extends": "cm.LOCATABLE",
+      "description": "An address of contact, which may be electronic (e-mail, phone) or geographic (postal, physical). The inherited name attribute carries the address type (e.g. 'electronic', 'locality'). Actual structure is archetyped via details.",
+      "properties": {
+        "details": { "type": "ds.ITEM_STRUCTURE", "description": "The address content. Archetyped." }
+      },
+      "required": ["details"]
+    },
+
+    "CONTACT": {
+      "extends": "cm.LOCATABLE",
+      "description": "A means of contacting a party for a specific purpose and optional time period. The inherited name attribute carries the purpose (e.g. 'mail', 'daytime phone'). Contains one or more ADDRESS alternatives for that purpose.",
+      "properties": {
+        "addresses": {
+          "type": "array", "items": { "type": "ADDRESS" }, "minItems": 1,
+          "description": "One or more address alternatives for this contact purpose and time validity."
+        },
+        "time_validity": { "type": "dt.DV_INTERVAL", "description": "Optional valid time interval for this contact descriptor." }
+      },
+      "required": ["addresses"]
+    },
+
+    "CAPABILITY": {
+      "extends": "cm.LOCATABLE",
+      "description": "A capability of a ROLE, such as 'EHR modifier' or 'health care provider', backed by credentials. The inherited name attribute carries the capability name.",
+      "properties": {
+        "credentials":   { "type": "ds.ITEM_STRUCTURE", "description": "Qualifications of the role performer for this capability: professional qualifications, provider numbers, etc. Archetyped." },
+        "time_validity": { "type": "dt.DV_INTERVAL",    "description": "Optional valid time interval for the credentials of this capability." }
+      },
+      "required": ["credentials"]
+    },
+
+    "PARTY_RELATIONSHIP": {
+      "extends": "cm.LOCATABLE",
+      "description": "A directed relationship between two parties. The source party stores the relationship by value; the target party holds only a back-reference. The inherited name attribute carries the relationship type (e.g. 'employment', 'patient'). Actual details are archetyped.",
+      "properties": {
+        "source":        { "type": "bt.PARTY_REF",      "description": "Reference to the Version container of the source party." },
+        "target":        { "type": "bt.PARTY_REF",      "description": "Reference to the Version container of the target party." },
+        "details":       { "type": "ds.ITEM_STRUCTURE", "description": "Optional archetyped detailed description of the relationship." },
+        "time_validity": { "type": "dt.DV_INTERVAL",    "description": "Optional valid time interval for this relationship." }
+      },
+      "required": ["source", "target"]
+    },
+
+    "PARTY": {
+      "extends": "cm.LOCATABLE",
+      "abstract": true,
+      "description": "Abstract ancestor of all party types: real-world entities (ACTORs) and their roles (ROLEs). The inherited name attribute indicates the party type (e.g. 'PERSON', 'ORGANISATION') or role name. The uid is redefined as HIER_OBJECT_ID to identify the Version container of this party. Must be an archetype root point.",
+      "properties": {
+        "identities": {
+          "type": "array", "items": { "type": "PARTY_IDENTITY" }, "minItems": 1,
+          "description": "Identities used by the party to identify itself: legal names, aliases, stage names, etc."
+        },
+        "contacts": {
+          "type": "array", "items": { "type": "CONTACT" }, "minItems": 1,
+          "description": "Optional contact descriptors for this party."
+        },
+        "details": { "type": "ds.ITEM_STRUCTURE", "description": "Optional archetyped additional details for this party, including state-issued identifiers." },
+        "relationships": {
+          "type": "array", "items": { "type": "PARTY_RELATIONSHIP" }, "minItems": 1,
+          "description": "Optional relationships in which this party participates as source. Stored by value."
+        },
+        "reverse_relationships": {
+          "type": "array", "items": { "type": "bt.LOCATABLE_REF" }, "minItems": 1,
+          "description": "Optional references to relationships in which this party participates as target. Stored by reference."
+        }
+      },
+      "required": ["identities"]
+    },
+
+    "ROLE": {
+      "extends": "PARTY",
+      "description": "A role performed by an ACTOR, corresponding to a competency or responsibility undertaken for a purpose. Roles should have credentials (via CAPABILITY) qualifying the performer. The uid identifies the Version container of this role.",
+      "properties": {
+        "performer":     { "type": "bt.PARTY_REF",  "description": "Reference to the Version container of the ACTOR playing this role." },
+        "capabilities": {
+          "type": "array", "items": { "type": "CAPABILITY" }, "minItems": 1,
+          "description": "Optional capabilities of this role, each backed by credentials."
+        },
+        "time_validity": { "type": "dt.DV_INTERVAL", "description": "Optional valid time interval for this role." }
+      },
+      "required": ["performer"]
+    },
+
+    "ACTOR": {
+      "extends": "PARTY",
+      "abstract": true,
+      "description": "Abstract ancestor of all real-world entity types: PERSON, ORGANISATION, GROUP, AGENT. An actor is any real-world entity capable of taking on a role.",
+      "properties": {
+        "languages": {
+          "type": "array", "items": { "type": "dt.DV_TEXT" }, "minItems": 1,
+          "description": "Languages which can be used to communicate with this actor, in preferred order of use."
+        },
+        "roles": {
+          "type": "array", "items": { "type": "bt.PARTY_REF" }, "minItems": 1,
+          "description": "References to the Version containers of each ROLE played by this actor."
+        }
+      },
+      "required": ["languages", "roles"]
+    },
+
+    "PERSON": {
+      "extends": "ACTOR",
+      "description": "Generic description of a person. Provides a dedicated concrete type to which Person archetypes can be targeted. All person-specific attributes (name, date of birth, sex, identifiers, etc.) are expressed via archetyped PARTY.details and PARTY_IDENTITY.details."
+    },
+
+    "ORGANISATION": {
+      "extends": "ACTOR",
+      "description": "Generic description of an organisation: a legally constituted body whose existence generally outlives the existence of parties considered to be part of it. All organisation-specific attributes are expressed via archetyped PARTY.details."
+    },
+
+    "GROUP": {
+      "extends": "ACTOR",
+      "description": "A real-world group of parties created by another party (usually an organisation) for a specific purpose, e.g. a specialist care team. Members typically work together. All group-specific attributes are expressed via archetyped PARTY.details."
+    },
+
+    "AGENT": {
+      "extends": "ACTOR",
+      "description": "Any kind of agent other than a human or organisation: devices, software systems, automated processes. All agent-specific attributes are expressed via archetyped PARTY.details."
+    }
+
+  }
+}

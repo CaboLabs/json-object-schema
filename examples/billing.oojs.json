@@ -1,0 +1,40 @@
+{
+  "$oojs": "1.0",
+  "$id": "https://example.org/schemas/billing",
+  "title": "Billing Domain",
+  "discriminator": "_type",
+  "imports": {
+    "core": "https://example.org/schemas/core"
+  },
+  "types": {
+    "Billable": {
+      "abstract": true,
+      "extends": "core.Entity",
+      "properties": {
+        "createdAt": { "type": "string", "minLength": 10 }
+      },
+      "required": ["createdAt"]
+    },
+    "Invoice": {
+      "extends": "Billable",
+      "properties": {
+        "invoiceNumber": { "type": "string", "minLength": 1 },
+        "issuer": { "type": "core.Organization" },
+        "recipient": { "type": "core.Person" },
+        "amount": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "enum": ["USD", "EUR", "UYU"] }
+      },
+      "required": ["invoiceNumber", "issuer", "recipient", "amount", "currency"]
+    },
+    "Payment": {
+      "extends": "Billable",
+      "properties": {
+        "paymentId": { "type": "string", "minLength": 1 },
+        "invoice": { "type": "Invoice" },
+        "processor": { "type": "core.Organization" },
+        "paidAmount": { "type": "number", "minimum": 0 }
+      },
+      "required": ["paymentId", "invoice", "processor", "paidAmount"]
+    }
+  }
+}

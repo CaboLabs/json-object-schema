@@ -1,0 +1,31 @@
+{
+  "$oojs": "1.0",
+  "$id": "https://example.org/schemas/core",
+  "title": "Core Domain",
+  "discriminator": "_type",
+  "types": {
+    "Entity": {
+      "abstract": true,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 }
+      },
+      "required": ["id"]
+    },
+    "Organization": {
+      "extends": "Entity",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "taxId": { "type": "string", "minLength": 3 }
+      },
+      "required": ["name", "taxId"]
+    },
+    "Person": {
+      "extends": "Entity",
+      "properties": {
+        "fullName": { "type": "string", "minLength": 1 },
+        "email": { "type": "string", "minLength": 3 }
+      },
+      "required": ["fullName"]
+    }
+  }
+}
