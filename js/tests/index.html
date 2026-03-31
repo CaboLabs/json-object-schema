@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OOJS — JS Test Suite</title>
+  <style>
+    body { font-family: monospace; background: #1a1a1a; color: #e0e0e0; margin: 2rem; }
+    h1 { font-size: 1.2rem; margin-bottom: 1rem; }
+    #summary { margin-bottom: 1rem; font-weight: bold; }
+    #summary.all-pass { color: #4caf50; }
+    #summary.has-fail { color: #f44336; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 0.2rem 0.4rem; border-left: 3px solid transparent; margin-bottom: 2px; }
+    li.pass { border-color: #4caf50; }
+    li.fail { border-color: #f44336; background: #2a1010; }
+    pre { margin: 0.3rem 0 0.3rem 1rem; color: #ff8a80; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>OOJS Validator — JavaScript Test Suite</h1>
+  <div id="summary">Running…</div>
+  <ul id="results"></ul>
+
+  <script type="module">
+    import { runAll } from './runner.js';
+    import './validator.test.js';   // registers all tests as a side-effect
+
+    const outputEl = document.getElementById('results');
+    const summaryEl = document.getElementById('summary');
+
+    const { passed, failed, total } = await runAll(outputEl);
+
+    summaryEl.textContent = `${passed}/${total} passed${failed > 0 ? `, ${failed} failed` : ''}`;
+    summaryEl.className = failed === 0 ? 'all-pass' : 'has-fail';
+  </script>
+</body>
+</html>

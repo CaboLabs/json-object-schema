@@ -507,7 +507,10 @@ class Registry:
         return self._by_dv.get(dv)
 
     def resolve_type(self, name: str, schema: Schema) -> TypeDef | None:
-        return self._resolve_type_ref.__wrapped__(self, name, schema, "<lookup>")  # type: ignore[attr-defined]
+        try:
+            return self._resolve_type_ref(name, schema, "<lookup>")
+        except SchemaError:
+            return None
 
     def resolve_type_in(self, name: str, schema_id: str) -> TypeDef | None:
         schema = self._schemas.get(schema_id)

@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <title>Test Documentation</title>
+        <style>
+            body {
+                text-rendering: optimizeLegibility;
+                font-family: Source SansSerif Pro, Arial, sans-serif;
+                font-variant-ligatures: common-ligatures;
+                font-kerning: normal;
+                margin-left: 2rem;
+                background-color: #fff;
+                color: #000;
+            }
+
+            body > ul > li {
+                font-size: larger;
+            }
+
+            h2 {
+                font-size: larger;
+                text-decoration-line: underline;
+                text-decoration-thickness: 2px;
+                margin: 0;
+                padding: 0.5rem 0;
+            }
+
+            ul {
+                list-style: none;
+                margin: 0 0 2rem;
+                padding: 0 0 0 1rem;
+                text-indent: -1rem;
+            }
+
+            .success:before {
+                color: #4e9a06;
+                content: '✓';
+                padding-right: 0.5rem;
+            }
+
+            .defect {
+                color: #a40000;
+            }
+
+            .defect:before {
+                color: #a40000;
+                content: '✗';
+                padding-right: 0.5rem;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Additional Properties (Oojs\Tests\AdditionalProperties)</h2>
+        <ul>
+            <li class="success">Additional property rejected</li>
+            <li class="success">Open world allows extra</li>
+        </ul>
+        <h2>Array Constraints (Oojs\Tests\ArrayConstraints)</h2>
+        <ul>
+            <li class="success">Not array</li>
+            <li class="success">Min items ok</li>
+            <li class="success">Min items fail</li>
+            <li class="success">Max items ok</li>
+            <li class="success">Max items fail</li>
+            <li class="success">Unique items ok</li>
+            <li class="success">Unique items fail</li>
+            <li class="success">Item constraint propagated</li>
+        </ul>
+        <h2>Clinical Example (Oojs\Tests\ClinicalExample)</h2>
+        <ul>
+            <li class="success">Valid instances pass</li>
+            <li class="success">Invalid instances fail</li>
+        </ul>
+        <h2>Coverage Completion (Oojs\Tests\CoverageCompletion)</h2>
+        <ul>
+            <li class="success">Error code private constructor is coverable</li>
+            <li class="success">Validation error to string</li>
+            <li class="success">Registry load json invalid</li>
+            <li class="success">Registry load file missing</li>
+            <li class="success">Registry load file and resolve type</li>
+            <li class="success">Registry parse array property rejects invalid unique items</li>
+            <li class="success">Validator validate json invalid json</li>
+            <li class="success">Validator validate json unknown type</li>
+            <li class="success">Validator type ref mismatch</li>
+            <li class="success">Validator type ref unknown type</li>
+            <li class="success">Validator type ref via imports</li>
+            <li class="success">Validator reports json type name</li>
+            <li class="success">Unique items canonicalizes object keys</li>
+        </ul>
+        <h2>Discriminator (Oojs\Tests\Discriminator)</h2>
+        <ul>
+            <li class="success">Missing discriminator</li>
+            <li class="success">Invalid discriminator type</li>
+            <li class="success">Unknown type</li>
+            <li class="success">Abstract type</li>
+            <li class="success">Type not subtype of target</li>
+            <li class="success">Valid concrete subtype</li>
+            <li class="success">Custom discriminator value</li>
+        </ul>
+        <h2>Effective Property Set (Oojs\Tests\EffectivePropertySet)</h2>
+        <ul>
+            <li class="success">Inherits parent properties</li>
+            <li class="success">Effective required union</li>
+        </ul>
+        <h2>Fail Fast (Oojs\Tests\FailFast)</h2>
+        <ul>
+            <li class="success">Fail fast returns single error</li>
+            <li class="success">Full mode returns all errors</li>
+        </ul>
+        <h2>Numeric Constraints (Oojs\Tests\NumericConstraints)</h2>
+        <ul>
+            <li class="success">Minimum ok</li>
+            <li class="success">Minimum fail</li>
+            <li class="success">Maximum ok</li>
+            <li class="success">Maximum fail</li>
+            <li class="success">Exclusive minimum ok</li>
+            <li class="success">Exclusive minimum fail</li>
+            <li class="success">Exclusive maximum ok</li>
+            <li class="success">Exclusive maximum fail</li>
+            <li class="success">Multiple of ok</li>
+            <li class="success">Multiple of fail</li>
+            <li class="success">Integer ok</li>
+            <li class="success">Integer float with fraction</li>
+            <li class="success">Integer float no fraction</li>
+            <li class="success">Enum number ok</li>
+            <li class="success">Enum number fail</li>
+        </ul>
+        <h2>Polymorphic Array (Oojs\Tests\PolymorphicArray)</h2>
+        <ul>
+            <li class="success">Polymorphic array valid</li>
+            <li class="success">Polymorphic array abstract item</li>
+            <li class="success">Polymorphic array missing required</li>
+        </ul>
+        <h2>Required (Oojs\Tests\Required)</h2>
+        <ul>
+            <li class="success">Missing own required</li>
+            <li class="success">Missing inherited required</li>
+            <li class="success">All required present</li>
+            <li class="success">Optional property absent is ok</li>
+        </ul>
+        <h2>Schema Loading (Oojs\Tests\SchemaLoading)</h2>
+        <ul>
+            <li class="success">Minimal valid schema</li>
+            <li class="success">Missing oojs</li>
+            <li class="success">Wrong version</li>
+            <li class="success">Missing id</li>
+            <li class="success">Missing types</li>
+            <li class="success">Empty types</li>
+            <li class="success">Invalid type name lowercase</li>
+            <li class="success">Reserved type name</li>
+            <li class="success">Discriminator collides with property</li>
+            <li class="success">Inheritance resolved</li>
+            <li class="success">Cycle detection</li>
+            <li class="success">Property redeclaration forbidden</li>
+            <li class="success">Required references own property</li>
+            <li class="success">Duplicate discriminator value</li>
+            <li class="success">Idempotent reload</li>
+            <li class="success">Invalid property name</li>
+            <li class="success">Mutually exclusive minimum</li>
+            <li class="success">Nested array forbidden</li>
+        </ul>
+        <h2>String Constraints (Oojs\Tests\StringConstraints)</h2>
+        <ul>
+            <li class="success">Min length ok</li>
+            <li class="success">Min length fail</li>
+            <li class="success">Max length ok</li>
+            <li class="success">Max length fail</li>
+            <li class="success">Pattern match</li>
+            <li class="success">Pattern no match</li>
+            <li class="success">Enum match</li>
+            <li class="success">Enum mismatch</li>
+            <li class="success">Type mismatch</li>
+        </ul>
+        <h2>Subtype Check (Oojs\Tests\SubtypeCheck)</h2>
+        <ul>
+            <li class="success">Direct subtype</li>
+            <li class="success">Same type</li>
+            <li class="success">Not subtype</li>
+            <li class="success">Transitive</li>
+        </ul>
+    </body>
+</html>
