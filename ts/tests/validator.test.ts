@@ -919,3 +919,334 @@ describe('SampleSchemas', () => {
     expect(validate(inst, schema.types['Fleet'], schema, r)).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Relationships (§8.6–§8.11)
+// ---------------------------------------------------------------------------
+
+function relVerticalSchema() {
+  return {
+    '$oojs': '1.0', '$id': 'https://example.org/schemas/vertical',
+    types: {
+      Motor: {
+        properties: {
+          horsepower: { type: 'integer', minimum: 1 },
+          fuelType: { type: 'string', enum: ['petrol', 'electric'] },
+        },
+        required: ['horsepower', 'fuelType'],
+      },
+      Wheel: {
+        properties: { size: { type: 'number', minimum: 10 } },
+        required: ['size'],
+      },
+      Car: {
+        properties: {
+          carId: { type: 'string' },
+          make: { type: 'string' },
+          motor: { type: 'Motor' },
+          wheels: { type: 'array', items: { type: 'Wheel' }, minItems: 4, maxItems: 4 },
+        },
+        required: ['carId', 'make', 'motor', 'wheels'],
+      },
+    },
+  };
+}
+
+function relHorizontalSchema() {
+  return {
+    '$oojs': '1.0', '$id': 'https://example.org/schemas/horizontal',
+    types: {
+      Person: {
+        properties: {
+          personId: { type: 'string' },
+          name: { type: 'string' },
+          carIds: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['personId', 'name'],
+      },
+      Car: {
+        properties: {
+          carId: { type: 'string' },
+          make: { type: 'string' },
+          ownerId: { type: 'string' },
+        },
+        required: ['carId', 'make', 'ownerId'],
+      },
+      Fleet: {
+        properties: {
+          fleetId: { type: 'string' },
+          name: { type: 'string' },
+          carIds: { type: 'array', items: { type: 'string' } },
+          personIds: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['fleetId', 'name'],
+      },
+    },
+  };
+}
+
+describe('Relationships', () => {
+  it('vertical has-one valid', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relVerticalSchema());
+    const car = {
+      _type: 'Car', carId: 'car-1', make: 'Acme',
+      motor: { _type: 'Motor', horsepower: 180, fuelType: 'petrol' },
+      wheels: [
+        { _type: 'Wheel', size: 18 },
+        { _type: 'Wheel', size: 18 },
+        { _type: 'Wheel', size: 18 },
+        { _type: 'Wheel', size: 18 },
+      ],
+    };
+    expect(validate(car, schema.types.Car, schema, r)).toEqual([]);
+  });
+
+  it('vertical has-one embedded missing required field', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relVerticalSchema());
+    const car = {
+      _type: 'Car', carId: 'car-1', make: 'Acme',
+      motor: { _type: 'Motor', horsepower: 180 },
+      wheels: [
+        { _type: 'Wheel', size: 18 },
+        { _type: 'Wheel', size: 18 },
+        { _type: 'Wheel', size: 18 },
+        { _type: 'Wheel', size: 18 },
+      ],
+    };
+    const errs = validate(car, schema.types.Car, schema, r);
+    expect(hasCode(errs, ErrorCode.MISSING_REQUIRED)).toBe(true);
+  });
+
+  it('vertical has-many wrong count', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relVerticalSchema());
+    const car = {
+      _type: 'Car', carId: 'car-1', make: 'Acme',
+      motor: { _type: 'Motor', horsepower: 200, fuelType: 'petrol' },
+      wheels: [
+        { _type: 'Wheel', size: 18 },
+        { _type: 'Wheel', size: 18 },
+        { _type: 'Wheel', size: 18 },
+      ],
+    };
+    const errs = validate(car, schema.types.Car, schema, r);
+    expect(hasCode(errs, ErrorCode.ARRAY_TOO_SHORT)).toBe(true);
+  });
+
+  it('horizontal has-one wrong type for id', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relHorizontalSchema());
+    const car = { _type: 'Car', carId: 'car-1', make: 'Acme', ownerId: 12345 };
+    const errs = validate(car, schema.types.Car, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('bidirectional inconsistency passes individual validation', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relHorizontalSchema());
+    const person = { _type: 'Person', personId: 'person-1', name: 'Alice', carIds: ['car-X'] };
+    const car = { _type: 'Car', carId: 'car-X', make: 'Acme', ownerId: 'person-99' };
+    expect(validate(person, schema.types.Person, schema, r)).toEqual([]);
+    expect(validate(car, schema.types.Car, schema, r)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cycles (§8.13)
+// ---------------------------------------------------------------------------
+
+describe('Cycle', () => {
+  it('self-referential type schema loads', () => {
+    const r = new Registry();
+    const schema = r.loadDict({
+      '$oojs': '1.0', '$id': 'https://example.org/schemas/self-ref',
+      types: {
+        Employee: {
+          properties: {
+            employeeId: { type: 'string' },
+            name: { type: 'string' },
+            manager: { type: 'Employee' },
+          },
+          required: ['employeeId', 'name'],
+        },
+      },
+    });
+    expect('Employee' in schema.types).toBe(true);
+  });
+
+  it('two-type cycle schema loads', () => {
+    const r = new Registry();
+    const schema = r.loadDict({
+      '$oojs': '1.0', '$id': 'https://example.org/schemas/two-cycle',
+      types: {
+        Employee: {
+          properties: {
+            employeeId: { type: 'string' },
+            name: { type: 'string' },
+            department: { type: 'Department' },
+          },
+          required: ['employeeId', 'name'],
+        },
+        Department: {
+          properties: {
+            departmentId: { type: 'string' },
+            name: { type: 'string' },
+            head: { type: 'Employee' },
+          },
+          required: ['departmentId', 'name'],
+        },
+      },
+    });
+    expect('Employee' in schema.types && 'Department' in schema.types).toBe(true);
+  });
+
+  it('finite nested self-reference validates', () => {
+    const r = new Registry();
+    const schema = r.loadDict({
+      '$oojs': '1.0', '$id': 'https://example.org/schemas/self-ref-inst',
+      types: {
+        Employee: {
+          properties: {
+            employeeId: { type: 'string' },
+            name: { type: 'string' },
+            manager: { type: 'Employee' },
+          },
+          required: ['employeeId', 'name'],
+        },
+      },
+    });
+
+    const alice = {
+      _type: 'Employee', employeeId: 'E-001', name: 'Alice',
+      manager: {
+        _type: 'Employee', employeeId: 'E-002', name: 'Bob',
+        manager: { _type: 'Employee', employeeId: 'E-003', name: 'Carol' },
+      },
+    };
+    expect(validate(alice, schema.types.Employee, schema, r)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Graph document (§8.12)
+// ---------------------------------------------------------------------------
+
+function employeeGraphSchema() {
+  return {
+    '$oojs': '1.0', '$id': 'https://example.org/schemas/employees',
+    types: {
+      Department: {
+        properties: {
+          departmentId: { type: 'string' },
+          name: { type: 'string' },
+        },
+        required: ['departmentId', 'name'],
+      },
+      Employee: {
+        properties: {
+          employeeId: { type: 'string' },
+          name: { type: 'string' },
+          department: { type: 'Department' },
+          manager: { type: 'Employee' },
+        },
+        required: ['employeeId', 'name', 'department'],
+      },
+    },
+  };
+}
+
+describe('GraphDocument', () => {
+  it('valid shared reference graph', () => {
+    const r = new Registry();
+    const schema = r.loadDict(employeeGraphSchema());
+
+    const graphDoc = {
+      '$oojs': '1.0',
+      roots: [
+        {
+          '$type': 'Employee', '$id': 'emp-alice',
+          employeeId: 'E-001', name: 'Alice',
+          department: { '$ref-id': 'dept-eng' },
+        },
+        {
+          '$type': 'Employee', '$id': 'emp-bob',
+          employeeId: 'E-002', name: 'Bob',
+          department: { '$ref-id': 'dept-eng' },
+        },
+      ],
+      objects: {
+        'dept-eng': {
+          '$type': 'Department', '$id': 'dept-eng',
+          departmentId: 'D-01', name: 'Engineering',
+        },
+      },
+    };
+
+    expect(new Validator(r).validateGraphDocument(graphDoc, schema)).toEqual([]);
+  });
+
+  it('unresolved $ref-id produces error', () => {
+    const r = new Registry();
+    const schema = r.loadDict(employeeGraphSchema());
+
+    const graphDoc = {
+      '$oojs': '1.0',
+      roots: [
+        {
+          '$type': 'Employee', '$id': 'emp-alice',
+          employeeId: 'E-001', name: 'Alice',
+          department: { '$ref-id': 'does-not-exist' },
+        },
+      ],
+    };
+
+    const errs = new Validator(r).validateGraphDocument(graphDoc, schema);
+    expect(errs.length).toBeGreaterThan(0);
+    expect(hasCode(errs, ErrorCode.UNRESOLVED_REFERENCE)).toBe(true);
+  });
+
+  it('ref-id target type mismatch produces error', () => {
+    const r = new Registry();
+    const schema = r.loadDict(employeeGraphSchema());
+
+    const graphDoc = {
+      '$oojs': '1.0',
+      roots: [
+        {
+          '$type': 'Employee', '$id': 'emp-alice',
+          employeeId: 'E-001', name: 'Alice',
+          department: { '$ref-id': 'not-a-dept' },
+        },
+      ],
+      objects: {
+        'not-a-dept': {
+          '$type': 'Employee', '$id': 'not-a-dept',
+          employeeId: 'E-999', name: 'Impostor',
+          department: { '$ref-id': 'not-a-dept' },
+        },
+      },
+    };
+
+    const errs = new Validator(r).validateGraphDocument(graphDoc, schema);
+    expect(errs.length).toBeGreaterThan(0);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('root missing $type produces error', () => {
+    const r = new Registry();
+    const schema = r.loadDict(employeeGraphSchema());
+
+    const graphDoc = {
+      '$oojs': '1.0',
+      roots: [
+        { '$id': 'emp-alice', employeeId: 'E-001', name: 'Alice' },
+      ],
+    };
+
+    const errs = new Validator(r).validateGraphDocument(graphDoc, schema);
+    expect(errs.length).toBeGreaterThan(0);
+    expect(hasCode(errs, ErrorCode.MISSING_DISCRIMINATOR)).toBe(true);
+  });
+});

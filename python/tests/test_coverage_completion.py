@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from oojs import Registry, SchemaError, ValidationError
-from oojs.validator import ErrorCode, Validator, validate
+from python import Registry, SchemaError, ValidationError
+from python.validator import ErrorCode, Validator, validate
 
 
 MINIMAL_SCHEMA = {

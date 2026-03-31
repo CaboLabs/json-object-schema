@@ -30,6 +30,7 @@ export const ErrorCode = Object.freeze({
   ARRAY_TOO_SHORT:             'ARRAY_TOO_SHORT',
   ARRAY_TOO_LONG:              'ARRAY_TOO_LONG',
   ARRAY_DUPLICATE_ITEMS:       'ARRAY_DUPLICATE_ITEMS',
+  UNRESOLVED_REFERENCE:        'UNRESOLVED_REFERENCE',
 } as const);
 
 export type ErrorCodeValue = typeof ErrorCode[keyof typeof ErrorCode];
@@ -57,10 +58,12 @@ export class ValidationError {
 export class Validator {
   private _registry: Registry;
   private _failFast: boolean;
+  private _graphIndex: Record<string, Record<string, unknown>> | null;
 
   constructor(registry: Registry, failFast = false) {
     this._registry = registry;
     this._failFast = failFast;
+    this._graphIndex = null;
   }
 
   validate(instance: unknown, targetType: TypeDef, schema: Schema): ValidationError[] {
@@ -76,6 +79,63 @@ export class Validator {
     const typedef = schema.types[targetTypeName];
     if (!typedef) throw new Error(`Type '${targetTypeName}' not found in schema '${schema.schemaId}'`);
     return this.validate(instance, typedef, schema);
+  }
+
+  validateGraphDocument(graphDoc: Record<string, unknown>, schema: Schema): ValidationError[] {
+    const errors: ValidationError[] = [];
+    const discName = schema.discriminator;
+
+    // Build $id -> raw-object index from roots and objects.
+    const index: Record<string, Record<string, unknown>> = {};
+    const roots = Array.isArray(graphDoc.roots) ? graphDoc.roots : [];
+    for (const obj of roots) {
+      if (isObj(obj) && typeof obj['$id'] === 'string') {
+        index[obj['$id']] = obj;
+      }
+    }
+    const objects = isObj(graphDoc.objects) ? graphDoc.objects : {};
+    for (const [id, obj] of Object.entries(objects)) {
+      if (isObj(obj)) {
+        index[id] = obj;
+      }
+    }
+    this._graphIndex = index;
+
+    const positions: Array<[string, Record<string, unknown>]> = [];
+    roots.forEach((obj, i) => {
+      if (isObj(obj)) positions.push([`roots/${i}`, obj]);
+    });
+    for (const [id, obj] of Object.entries(objects)) {
+      if (isObj(obj)) positions.push([`objects/${escapePointer(id)}`, obj]);
+    }
+
+    for (const [path, obj] of positions) {
+      const instance: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        if (k === '$id') continue;
+        if (k === '$type') {
+          instance[discName] = v;
+          continue;
+        }
+        instance[k] = v;
+      }
+
+      const discVal = instance[discName];
+      if (typeof discVal !== 'string') {
+        errors.push(new ValidationError(path, ErrorCode.MISSING_DISCRIMINATOR, 'graph object missing $type field'));
+        continue;
+      }
+      const typedef = this._registry.lookupByDiscriminatorValue(discVal);
+      if (!typedef) {
+        errors.push(new ValidationError(`${path}/$type`, ErrorCode.UNKNOWN_TYPE, `unknown type '${discVal}'`));
+        continue;
+      }
+
+      this._validateInstance(instance, typedef, schema, path, errors);
+    }
+
+    this._graphIndex = null;
+    return errors;
   }
 
   private _validateInstance(
@@ -306,6 +366,45 @@ export class Validator {
     path: string,
     errors: ValidationError[],
   ): boolean {
+    // Graph-document mode: "$ref-id" type-check only (no recursive inline validation).
+    if (
+      this._graphIndex != null &&
+      isObj(value) &&
+      Object.keys(value).length === 1 &&
+      Object.prototype.hasOwnProperty.call(value, '$ref-id')
+    ) {
+      const refId = value['$ref-id'];
+      if (typeof refId !== 'string') {
+        errors.push(new ValidationError(path, ErrorCode.TYPE_MISMATCH, '$ref-id must be a string'));
+        return !this._failFast;
+      }
+
+      const target = this._graphIndex[refId];
+      if (!target) {
+        errors.push(new ValidationError(path, ErrorCode.UNRESOLVED_REFERENCE, `unresolved $ref-id '${refId}'`));
+        return !this._failFast;
+      }
+
+      const targetTypeName = target['$type'];
+      if (typeof targetTypeName !== 'string') {
+        errors.push(new ValidationError(path, ErrorCode.MISSING_DISCRIMINATOR, 'referenced object missing $type'));
+        return !this._failFast;
+      }
+
+      const targetTypedef = this._registry.lookupByDiscriminatorValue(targetTypeName);
+      const refTypedef = this._registry.resolveTypeIn(prop.typeName, schema.schemaId);
+      if (!targetTypedef || !refTypedef) {
+        errors.push(new ValidationError(path, ErrorCode.UNKNOWN_TYPE, `cannot resolve type '${prop.typeName}'`));
+        return !this._failFast;
+      }
+      if (!targetTypedef.isSubtypeOf(refTypedef)) {
+        errors.push(new ValidationError(path, ErrorCode.TYPE_MISMATCH,
+          `type '${targetTypeName}' is not a subtype of '${prop.typeName}'`));
+        return !this._failFast;
+      }
+      return true;
+    }
+
     if (!isObj(value)) {
       errors.push(new ValidationError(path, ErrorCode.TYPE_MISMATCH,
         'expected a JSON object for type reference'));

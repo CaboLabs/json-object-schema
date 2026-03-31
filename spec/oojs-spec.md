@@ -50,6 +50,7 @@ JSON Schema [JSON-SCHEMA] is widely used for validating JSON documents. However,
 - `oneOf`-based polymorphism validates all branches sequentially (O(N) in the number of subtypes), producing unactionable error messages when validation fails.
 - No mechanism exists to declare a type as abstract (non-instantiable).
 - Inherited `required` constraints are not automatically propagated to subtypes.
+- JSON and JSON Schema assume all inter-object relationships are expressed through embedding: a child object is always nested inside its parent. This conflates two distinct OO concepts — composition (the parent owns the child) and association (the parent merely references an independently-existing object). Non-owning associations, where the referenced object has its own lifecycle and may be shared across multiple owners, cannot be expressed structurally in JSON without reducing the reference to an opaque identifier whose type and validity are invisible to the schema.
 
 OOJS provides a compact, formally specified alternative with these constructs as first-class concepts.
 

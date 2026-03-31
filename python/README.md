@@ -239,7 +239,7 @@ python -m oojs inspect examples/clinical.oojs.json --type Observation
 ```bash
 # From the repository root
 pip install pytest
-pytest tests/
+pytest python/tests/
 ```
 
 The test suite covers all schema-loading rules, all validation phases, all constraint types, polymorphic dispatch, fail-fast mode, and the clinical integration example.

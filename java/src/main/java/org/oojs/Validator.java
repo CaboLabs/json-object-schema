@@ -15,6 +15,7 @@ public class Validator {
 
     private final Registry registry;
     private final boolean failFast;
+    private Map<String, Map<String, Object>> graphIndex = null;
 
     public Validator(Registry registry) {
         this(registry, false);
@@ -47,6 +48,96 @@ public class Validator {
             throw new IllegalArgumentException("Type '" + targetTypeName + "' not found in schema '" + schema.schemaId + "'");
         }
         return validate(instance, typedef, schema);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<ValidationError> validateGraphDocument(Map<String, Object> graphDoc, Schema schema) {
+        List<ValidationError> errors = new ArrayList<>();
+        String discName = schema.discriminator;
+
+        // Build $id -> raw-object index from roots and objects.
+        Map<String, Map<String, Object>> index = new LinkedHashMap<>();
+        Object rawRoots = graphDoc.get("roots");
+        if (rawRoots instanceof List) {
+            List<?> roots = (List<?>) rawRoots;
+            for (Object rootObj : roots) {
+                if (!(rootObj instanceof Map)) {
+                    continue;
+                }
+                Map<String, Object> root = (Map<String, Object>) rootObj;
+                Object idObj = root.get("$id");
+                if (idObj instanceof String) {
+                    index.put((String) idObj, root);
+                }
+            }
+        }
+        Object rawObjects = graphDoc.get("objects");
+        if (rawObjects instanceof Map) {
+            Map<?, ?> objects = (Map<?, ?>) rawObjects;
+            for (Map.Entry<?, ?> entry : objects.entrySet()) {
+                if (!(entry.getValue() instanceof Map)) {
+                    continue;
+                }
+                index.put(String.valueOf(entry.getKey()), (Map<String, Object>) entry.getValue());
+            }
+        }
+        graphIndex = index;
+
+        Map<String, Map<String, Object>> positions = new LinkedHashMap<>();
+        if (rawRoots instanceof List) {
+            List<?> roots = (List<?>) rawRoots;
+            for (int i = 0; i < roots.size(); i++) {
+                if (roots.get(i) instanceof Map) {
+                    positions.put("roots/" + i, (Map<String, Object>) roots.get(i));
+                }
+            }
+        }
+        if (rawObjects instanceof Map) {
+            Map<?, ?> objects = (Map<?, ?>) rawObjects;
+            for (Map.Entry<?, ?> entry : objects.entrySet()) {
+                if (entry.getValue() instanceof Map) {
+                    positions.put("objects/" + escape(String.valueOf(entry.getKey())),
+                            (Map<String, Object>) entry.getValue());
+                }
+            }
+        }
+
+        for (Map.Entry<String, Map<String, Object>> pos : positions.entrySet()) {
+            String path = pos.getKey();
+            Map<String, Object> raw = pos.getValue();
+
+            // Convert graph-object shape to regular instance shape.
+            Map<String, Object> instance = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : raw.entrySet()) {
+                String key = entry.getKey();
+                if ("$id".equals(key)) {
+                    continue;
+                }
+                if ("$type".equals(key)) {
+                    instance.put(discName, entry.getValue());
+                    continue;
+                }
+                instance.put(key, entry.getValue());
+            }
+
+            Object discVal = instance.get(discName);
+            if (!(discVal instanceof String)) {
+                errors.add(new ValidationError(path, ErrorCode.MISSING_DISCRIMINATOR,
+                        "graph object missing $type field"));
+                continue;
+            }
+            TypeDef typedef = registry.lookupByDiscriminatorValue((String) discVal);
+            if (typedef == null) {
+                errors.add(new ValidationError(path + "/$type", ErrorCode.UNKNOWN_TYPE,
+                        "unknown type '" + discVal + "'"));
+                continue;
+            }
+
+            validateInstance(instance, typedef, schema, path, errors);
+        }
+
+        graphIndex = null;
+        return errors;
     }
 
     // ------------------------------------------------------------------
@@ -269,6 +360,48 @@ public class Validator {
 
     private boolean validateTypeRef(Object value, TypeRefProperty prop, Schema schema,
             String path, List<ValidationError> errors) {
+        // Graph-document mode: { "$ref-id": "..." } references another top-level
+        // graph object. We type-check the referenced object's $type and avoid
+        // recursive inline validation so cycles terminate naturally.
+        if (graphIndex != null && value instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> maybeRef = (Map<String, Object>) value;
+            if (maybeRef.size() == 1 && maybeRef.containsKey("$ref-id")) {
+                Object refIdObj = maybeRef.get("$ref-id");
+                if (!(refIdObj instanceof String)) {
+                    errors.add(new ValidationError(path, ErrorCode.TYPE_MISMATCH, "$ref-id must be a string"));
+                    return !failFast;
+                }
+                String refId = (String) refIdObj;
+                Map<String, Object> target = graphIndex.get(refId);
+                if (target == null) {
+                    errors.add(new ValidationError(path, ErrorCode.UNRESOLVED_REFERENCE,
+                            "unresolved $ref-id '" + refId + "'"));
+                    return !failFast;
+                }
+                Object targetTypeNameObj = target.get("$type");
+                if (!(targetTypeNameObj instanceof String)) {
+                    errors.add(new ValidationError(path, ErrorCode.MISSING_DISCRIMINATOR,
+                            "referenced object missing $type"));
+                    return !failFast;
+                }
+                String targetTypeName = (String) targetTypeNameObj;
+                TypeDef targetTypedef = registry.lookupByDiscriminatorValue(targetTypeName);
+                TypeDef refTypedef = registry.resolveTypeIn(prop.typeName, schema.schemaId);
+                if (targetTypedef == null || refTypedef == null) {
+                    errors.add(new ValidationError(path, ErrorCode.UNKNOWN_TYPE,
+                            "cannot resolve type '" + prop.typeName + "'"));
+                    return !failFast;
+                }
+                if (!targetTypedef.isSubtypeOf(refTypedef)) {
+                    errors.add(new ValidationError(path, ErrorCode.TYPE_MISMATCH,
+                            "type '" + targetTypeName + "' is not a subtype of '" + prop.typeName + "'"));
+                    return !failFast;
+                }
+                return true;
+            }
+        }
+
         if (!(value instanceof Map)) {
             errors.add(new ValidationError(path, ErrorCode.TYPE_MISMATCH, "expected a JSON object for type reference"));
             return !failFast;

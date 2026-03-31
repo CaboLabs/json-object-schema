@@ -25,6 +25,14 @@ use Oojs\Model\TypeRefProperty;
  */
 class Validator
 {
+    /**
+     * When non-null, the validator is operating in graph-document mode (§8.12).
+     * Maps $id string → raw graph object (with '$type', '$id', and '$ref-id' fields intact).
+     *
+     * @var array<string,array>|null
+     */
+    private ?array $graphIndex = null;
+
     public function __construct(
         private readonly Registry $registry,
         private readonly bool $failFast = false,
@@ -67,6 +75,95 @@ class Validator
             );
         }
         return $this->validate($instance, $typedef, $schema);
+    }
+
+    /**
+     * Validate a graph document (§8.12).
+     *
+     * A graph document is a JSON object with:
+     *   - "$oojs": "1.0"
+     *   - "roots": array of objects (each with "$type" and "$id")
+     *   - "objects": optional map of "$id" → object
+     *
+     * TypeRef properties that hold a { "$ref-id": "…" } value are type-checked
+     * against the referenced object's "$type"; they are not re-validated inline
+     * (the referenced object is validated at the top level of the document).
+     * This design naturally handles cycles in the object graph (§8.13).
+     *
+     * @param  array<string,mixed>  $graphDoc  Decoded graph document
+     * @return list<ValidationError>
+     */
+    public function validateGraphDocument(array $graphDoc, Schema $schema): array
+    {
+        $errors    = [];
+        $discName  = $schema->discriminator;
+
+        // Build $id → raw-object index (Pass 1 of §8.12.5)
+        $index = [];
+        foreach ($graphDoc['roots'] ?? [] as $obj) {
+            if (is_array($obj) && isset($obj['$id']) && is_string($obj['$id'])) {
+                $index[$obj['$id']] = $obj;
+            }
+        }
+        foreach ($graphDoc['objects'] ?? [] as $id => $obj) {
+            if (is_array($obj)) {
+                $index[(string)$id] = $obj;
+            }
+        }
+        $this->graphIndex = $index;
+
+        // Validate each object in roots, then objects (Pass 2)
+        $positions = [];
+        foreach ($graphDoc['roots'] ?? [] as $i => $obj) {
+            $positions["roots/$i"] = $obj;
+        }
+        foreach ($graphDoc['objects'] ?? [] as $id => $obj) {
+            $positions['objects/' . self::escape((string)$id)] = $obj;
+        }
+
+        foreach ($positions as $path => $obj) {
+            if (!is_array($obj)) {
+                continue;
+            }
+
+            // Build a plain instance: map "$type" → discriminator field, strip "$id"
+            $instance = [];
+            foreach ($obj as $k => $v) {
+                if ($k === '$id') {
+                    continue;
+                }
+                if ($k === '$type') {
+                    $instance[$discName] = $v;
+                    continue;
+                }
+                $instance[$k] = $v;
+            }
+
+            // Resolve discriminator value → TypeDef
+            $discVal = $instance[$discName] ?? null;
+            if (!is_string($discVal)) {
+                $errors[] = new ValidationError(
+                    $path,
+                    ErrorCode::MISSING_DISCRIMINATOR,
+                    "graph object missing \$type field",
+                );
+                continue;
+            }
+            $typedef = $this->registry->lookupByDiscriminatorValue($discVal);
+            if ($typedef === null) {
+                $errors[] = new ValidationError(
+                    "$path/\$type",
+                    ErrorCode::UNKNOWN_TYPE,
+                    "unknown type '$discVal'",
+                );
+                continue;
+            }
+
+            $this->validateInstance($instance, $typedef, $schema, $path, $errors);
+        }
+
+        $this->graphIndex = null;
+        return $errors;
     }
 
     // ------------------------------------------------------------------
@@ -447,6 +544,53 @@ class Validator
         string $path,
         array &$errors,
     ): bool {
+        // Graph document mode (§8.12): { "$ref-id": "…" } is a reference to another
+        // graph object. We type-check it (ensure the target's $type is a subtype of
+        // the expected type) but do NOT inline-validate the target — it is validated
+        // independently at the top level of the graph document, which also makes cycle
+        // handling (§8.13) implicit: no recursive descent, no visited-set required.
+        if (
+            $this->graphIndex !== null &&
+            is_array($value) &&
+            count($value) === 1 &&
+            array_key_exists('$ref-id', $value)
+        ) {
+            $refId  = $value['$ref-id'];
+            if (!is_string($refId)) {
+                $errors[] = new ValidationError($path, ErrorCode::TYPE_MISMATCH, '$ref-id must be a string');
+                return !$this->failFast;
+            }
+            $target = $this->graphIndex[$refId] ?? null;
+            if ($target === null) {
+                $errors[] = new ValidationError(
+                    $path,
+                    ErrorCode::UNRESOLVED_REFERENCE,
+                    "unresolved \$ref-id '$refId'",
+                );
+                return !$this->failFast;
+            }
+            $targetTypeName = $target['$type'] ?? null;
+            if (!is_string($targetTypeName)) {
+                $errors[] = new ValidationError($path, ErrorCode::MISSING_DISCRIMINATOR, "referenced object missing \$type");
+                return !$this->failFast;
+            }
+            $targetTypedef = $this->registry->lookupByDiscriminatorValue($targetTypeName);
+            $refTypedef    = $this->registry->resolveTypeIn($prop->typeName, $schema->schemaId);
+            if ($targetTypedef === null || $refTypedef === null) {
+                $errors[] = new ValidationError($path, ErrorCode::UNKNOWN_TYPE, "cannot resolve type '{$prop->typeName}'");
+                return !$this->failFast;
+            }
+            if (!$targetTypedef->isSubtypeOf($refTypedef)) {
+                $errors[] = new ValidationError(
+                    $path,
+                    ErrorCode::TYPE_MISMATCH,
+                    "type '$targetTypeName' is not a subtype of '{$prop->typeName}'",
+                );
+                return !$this->failFast;
+            }
+            return true;
+        }
+
         if (!is_array($value)) {
             $errors[] = new ValidationError(
                 $path,

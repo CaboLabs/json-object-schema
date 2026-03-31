@@ -41,5 +41,8 @@ final class ErrorCode
     public const ARRAY_TOO_LONG             = 'ARRAY_TOO_LONG';
     public const ARRAY_DUPLICATE_ITEMS      = 'ARRAY_DUPLICATE_ITEMS';
 
+    // Graph document errors (§8.12)
+    public const UNRESOLVED_REFERENCE       = 'UNRESOLVED_REFERENCE';
+
     private function __construct() {}
 }

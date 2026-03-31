@@ -22,6 +22,7 @@ public final class ErrorCode {
     public static final String ARRAY_TOO_SHORT            = "ARRAY_TOO_SHORT";
     public static final String ARRAY_TOO_LONG             = "ARRAY_TOO_LONG";
     public static final String ARRAY_DUPLICATE_ITEMS      = "ARRAY_DUPLICATE_ITEMS";
+    public static final String UNRESOLVED_REFERENCE       = "UNRESOLVED_REFERENCE";
 
     private ErrorCode() {}
 }

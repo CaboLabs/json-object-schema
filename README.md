@@ -13,6 +13,22 @@ JSON Schema requires verbose workarounds for common OO patterns:
 | Polymorphism | `oneOf` + OpenAPI `discriminator` | OpenAPI extension, manual mapping, poor error messages |
 | Type identity | Structural only | No nominal typing; no concept of a type hierarchy |
 
+### Why not just use JSON Schema 2020-12?
+
+JSON Schema 2020-12 addressed some of these problems — `unevaluatedProperties` was introduced specifically to fix the `allOf`-inheritance breakage, and the `discriminator` keyword exists as an OpenAPI extension. So can't you just use those?
+
+Technically yes, but the cost is high:
+
+- **`unevaluatedProperties` is the most complex keyword in the entire JSON Schema specification.** Correct use requires understanding annotation propagation and evaluation paths — deep internals that most practitioners never need to touch. OOJS achieves the same inheritance semantics with a single `"extends": "BaseType"` declaration.
+
+- **Abstract types still have no first-class representation.** Preventing direct instantiation of a base type requires `if/then` hacks or out-of-band documentation with no enforcement.
+
+- **Polymorphic dispatch in `oneOf` is O(N).** Every branch is validated against every candidate type; the first matching branch wins. For a hierarchy with many subtypes this is slow, and when validation fails the error output lists failures across *every* branch — unactionable noise. OOJS resolves the concrete type in O(1) via the discriminator field and reports errors only for the matched type.
+
+- **JSON Schema is structurally typed; OO domain models are nominally typed.** A JSON Schema validator does not know that `Observation` *is a* `ClinicalEntry` — it only knows their property shapes happen to be compatible. OOJS makes the IS-A relationship explicit and enforces it, which is what class-based domain modeling actually requires.
+
+- **The output of OOJS is JSON Schema.** A conforming OOJS processor can emit an equivalent JSON Schema 2020-12 document. OOJS is therefore not a replacement for JSON Schema — it is a higher-level authoring language that compiles down to it, in the same way TypeScript compiles to JavaScript. You get the expressiveness of OO modeling and the broad tooling support of JSON Schema.
+
 ## The Solution
 
 OOJS provides first-class OO concepts in a compact JSON format:

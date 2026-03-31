@@ -258,6 +258,19 @@ composer install
 ./vendor/bin/phpunit
 ```
 
+### HTML Report
+
+```bash
+/vendor/bin/phpunit --testdox-html test-results.html
+```
+
+### HTML Coverage Report
+
+```bash
+XDEBUG_MODE=coverage ./vendor/bin/phpunit --coverage-html report-directory
+```
+
+
 Expected output:
 
 ```
