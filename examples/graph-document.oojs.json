@@ -1,0 +1,39 @@
+{
+  "$oojs": "1.0",
+  "$id":   "https://example.org/schemas/graph-document",
+  "title": "Graph Document — Employees and Departments",
+  "description": "Schema for the graph-document.json example (§8.12). Demonstrates horizontal relationships expressed via { \"$ref-id\": \"...\" } within a single graph document: Employee.department (has-one → Department) and Employee.manager (optional has-one → Employee, self-referential).",
+  "discriminator": "$type",
+
+  "types": {
+
+    "Department": {
+      "title": "Department",
+      "description": "An organizational department. Exists independently — multiple Employees can reference the same Department.",
+      "properties": {
+        "departmentId": { "type": "string", "minLength": 1, "description": "Unique identifier" },
+        "name":         { "type": "string", "minLength": 1 }
+      },
+      "required": ["departmentId", "name"]
+    },
+
+    "Employee": {
+      "title": "Employee",
+      "description": "An employee belonging to a Department. HAS-ONE HORIZONTAL → Department via $ref-id (the Department object is stored separately in 'objects' and shared across Employees). Optional HAS-ONE HORIZONTAL → Employee (self-referential manager link).",
+      "properties": {
+        "employeeId": { "type": "string", "minLength": 1, "description": "Unique identifier" },
+        "name":       { "type": "string", "minLength": 1 },
+        "department": {
+          "type": "Department",
+          "description": "HAS-ONE HORIZONTAL: in a graph document this is expressed as { \"$ref-id\": \"<dept-$id>\" } rather than a bare ID string or an embedded object."
+        },
+        "manager": {
+          "type": "Employee",
+          "description": "Optional HAS-ONE HORIZONTAL (self-referential): the employee's direct manager, also expressed as a $ref-id reference."
+        }
+      },
+      "required": ["employeeId", "name", "department"]
+    }
+
+  }
+}

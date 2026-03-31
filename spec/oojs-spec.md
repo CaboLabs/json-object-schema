@@ -27,6 +27,8 @@ This document specifies the Object-Oriented JSON Schema (OOJS) language, version
    - 8.8 [Vertical Relationships (Hierarchical / Embedded)](#88-vertical-relationships-hierarchical--embedded)
    - 8.9 [Horizontal Relationships (Non-Hierarchical / Reference by ID)](#89-horizontal-relationships-non-hierarchical--reference-by-id)
    - 8.10 [Choosing Between Vertical and Horizontal](#810-choosing-between-vertical-and-horizontal)
+   - 8.11 [Unidirectional and Bidirectional Relationships](#811-unidirectional-and-bidirectional-relationships)
+   - 8.12 [Graph Document Format](#812-graph-document-format)
 9. [Validation](#9-validation)
 10. [Schema Registry and Imports](#10-schema-registry-and-imports)
 11. [Naming Rules](#11-naming-rules)
@@ -604,6 +606,8 @@ A valid `Fleet` instance holds only IDs; the `Car` and `Person` objects are fetc
 - The JSON document remains small even when many objects are associated.
 - Appropriate for **associations**: when the referenced object exists independently and may be shared.
 
+> **Note — same-document references**: The referenced objects in a horizontal relationship do not have to reside in a separate document or data store. When it is useful to serialize a complete object graph in one JSON file, the **Graph Document format** (§8.12) allows referenced objects to be co-located in the same document and linked via `{ "$ref-id": "<id>" }` expressions instead of bare ID strings. This preserves object independence (no embedding) while enabling atomic transport and validation of the whole graph.
+
 ---
 
 ### 8.10 Choosing Between Vertical and Horizontal
@@ -620,6 +624,317 @@ The following guidelines assist schema authors in selecting the appropriate rela
 | Does the associated object outlive its owner? | No → embed | Yes → reference |
 
 A single schema may freely mix vertical and horizontal relationships. For example, a `Car` might embed its `Motor` vertically (the motor has no existence outside the car) while referencing its `Owner` horizontally (the owner exists independently and may own multiple cars).
+
+---
+
+### 8.11 Unidirectional and Bidirectional Relationships
+
+#### 8.11.1 Definitions
+
+A relationship between types A and B has a **direction**: the side that holds the reference is called the **source** and the side being pointed to is called the **target**.
+
+- A **unidirectional relationship** is navigable in one direction only. The source type declares a property that references the target, but the target type declares no corresponding back-reference. Navigation from target back to source requires a separate query or index maintained by the application.
+
+- A **bidirectional relationship** is navigable in both directions. Both types declare properties that reference each other, forming a pair of complementary references. Either side can be used as a starting point to reach the other.
+
+Directionality is a schema design choice, not a constraint enforced by OOJS. The validator treats each property independently; it has no knowledge of whether two properties in different types are intended to form a bidirectional pair.
+
+#### 8.11.2 Unidirectional Relationships
+
+In a unidirectional relationship, only one type declares the reference.
+
+**Example — unidirectional horizontal has-one**: `Invoice` references its `Customer` by ID. `Customer` has no knowledge of its invoices.
+
+```json
+"Customer": {
+  "properties": {
+    "customerId": { "type": "string" },
+    "name":       { "type": "string" }
+  },
+  "required": ["customerId", "name"]
+},
+"Invoice": {
+  "properties": {
+    "invoiceId":  { "type": "string" },
+    "amount":     { "type": "number", "minimum": 0 },
+    "customerId": {
+      "type":        "string",
+      "description": "UNIDIRECTIONAL HAS-ONE HORIZONTAL → Customer. Navigate: Invoice → Customer. No back-reference on Customer."
+    }
+  },
+  "required": ["invoiceId", "amount", "customerId"]
+}
+```
+
+Instances:
+
+```json
+{ "_type": "Customer", "customerId": "cust-1", "name": "Acme Corp" }
+
+{ "_type": "Invoice", "invoiceId": "inv-001", "amount": 450.00, "customerId": "cust-1" }
+```
+
+To find all invoices for a given customer the application must query for `Invoice` instances where `customerId` equals the customer's ID. The schema alone does not express this navigation path.
+
+**Characteristics of unidirectional relationships:**
+
+- Simpler schema — only one property to declare and maintain.
+- The target type is unaware it is being referenced; it can be updated independently without touching the reference-holder type.
+- No consistency to enforce between the two ends — there is only one end.
+- Suitable when navigation is needed in only one direction, or when the target type is shared across many schemas (avoiding coupling).
+
+#### 8.11.3 Bidirectional Relationships
+
+In a bidirectional relationship, both types declare properties that reference each other. This allows navigation from either end without a secondary lookup.
+
+**Example — bidirectional horizontal has-one / has-many**: `Person` holds a list of car IDs (`carIds`); `Car` holds a single owner ID (`ownerId`). Both sides reference the other.
+
+```json
+"Person": {
+  "properties": {
+    "personId": { "type": "string" },
+    "name":     { "type": "string" },
+    "carIds": {
+      "type":  "array",
+      "items": { "type": "string" },
+      "description": "BIDIRECTIONAL HAS-MANY HORIZONTAL ↔ Car. This is the inverse side: navigate Person → [Car]."
+    }
+  },
+  "required": ["personId", "name"]
+},
+"Car": {
+  "properties": {
+    "carId":   { "type": "string" },
+    "make":    { "type": "string" },
+    "ownerId": {
+      "type":        "string",
+      "description": "BIDIRECTIONAL HAS-ONE HORIZONTAL ↔ Person. This is the owning side: navigate Car → Person."
+    }
+  },
+  "required": ["carId", "make", "ownerId"]
+}
+```
+
+Instances (showing both sides of the same relationship):
+
+```json
+{ "_type": "Person", "personId": "person-1", "name": "Alice", "carIds": ["car-1", "car-2"] }
+
+{ "_type": "Car", "carId": "car-1", "make": "Acme", "ownerId": "person-1" }
+{ "_type": "Car", "carId": "car-2", "make": "ZipCar", "ownerId": "person-1" }
+```
+
+**Consistency in bidirectional relationships** — OOJS validates each instance independently and does not cross-check the two ends of a bidirectional pair. The following inconsistent state passes OOJS validation without error:
+
+```json
+{ "_type": "Person", "personId": "person-1", "name": "Alice", "carIds": ["car-1"] }
+
+{ "_type": "Car", "carId": "car-1", "make": "Acme", "ownerId": "person-2" }
+```
+
+Here `Person` claims to own `car-1` but `Car` claims its owner is `person-2`. OOJS reports no validation error because each object is individually structurally valid. **Maintaining bidirectional consistency is the application's responsibility.** Schema authors SHOULD document which side is considered authoritative (the *owning side*) when the two ends disagree.
+
+**Owning side convention**: In horizontal bidirectional relationships it is RECOMMENDED to designate one side as the owning side — the side whose property is the authoritative source of truth for the relationship. By convention:
+
+- For has-one / has-many pairs, the "many" side (the one with the foreign key scalar) is typically the owning side (`Car.ownerId` in the example above).
+- For many-to-many pairs, either side may be chosen; the choice SHOULD be documented in the schema's `description` fields.
+
+**Example — bidirectional vertical has-many / unidirectional back-reference**: A vertical relationship (embedded array) can carry a back-reference ID on the embedded object to make it navigable in both directions, even though the embedded object cannot literally point to its container.
+
+```json
+"Report": {
+  "properties": {
+    "reportId": { "type": "string" },
+    "sections": {
+      "type":  "array",
+      "items": { "type": "Section" },
+      "description": "HAS-MANY VERTICAL (owning side): Sections are embedded in the Report."
+    }
+  },
+  "required": ["reportId", "sections"]
+},
+"Section": {
+  "properties": {
+    "sectionId": { "type": "string" },
+    "title":     { "type": "string" },
+    "reportId": {
+      "type":        "string",
+      "description": "BACK-REFERENCE (horizontal): the ID of the Report this Section belongs to, stored redundantly to enable navigation from Section → Report without parsing the full Report document."
+    }
+  },
+  "required": ["sectionId", "title", "reportId"]
+}
+```
+
+A valid `Report` with back-references embedded in each `Section`:
+
+```json
+{
+  "_type":    "Report",
+  "reportId": "rpt-001",
+  "sections": [
+    { "_type": "Section", "sectionId": "sec-001", "title": "Introduction", "reportId": "rpt-001" },
+    { "_type": "Section", "sectionId": "sec-002", "title": "Findings",     "reportId": "rpt-001" }
+  ]
+}
+```
+
+As before, OOJS does not verify that `section.reportId` matches the ID of the enclosing `Report`. That invariant is enforced by the application.
+
+**Characteristics of bidirectional relationships:**
+
+- Navigation is possible from either side without a secondary query.
+- Both ends must be kept in sync when the relationship changes — this is an application responsibility.
+- One side should be designated the *owning side* to resolve conflicts and guide update logic.
+- Not applicable to vertical relationships in their pure form (an embedded object cannot hold a JSON reference to its container object); a back-reference ID on the embedded object approximates bidirectionality for horizontal navigation.
+
+#### 8.11.4 Summary Table
+
+| | Unidirectional | Bidirectional |
+|---|---|---|
+| Properties declared | One side only | Both sides |
+| Navigation | Source → Target only | Either direction |
+| Consistency to maintain | None (single source of truth) | Application must keep both ends in sync |
+| Schema complexity | Lower | Higher |
+| Coupling between types | Weaker | Stronger |
+| OOJS enforcement | N/A | None — each object is validated independently |
+| Applicable to vertical? | Yes (normal case) | Back-reference ID only (not pure embedding) |
+| Applicable to horizontal? | Yes | Yes |
+
+---
+
+### 8.12 Graph Document Format
+
+A **graph document** is a single JSON file that contains multiple interconnected OOJS instances. Rather than storing one object per file, a graph document collects a set of objects and their inter-references within one JSON envelope, enabling a complete object graph to be serialized, transported, and validated atomically.
+
+#### 8.12.1 Motivation
+
+In horizontal relationships (§8.9), referenced objects normally reside outside the current JSON document — in a separate file, database row, or API response. However, it is often useful to serialize a complete object graph into one document without embedding every object vertically inside a single root. Vertical embedding (§8.8) would either duplicate shared objects or force an arbitrary nesting hierarchy. The graph document format avoids both problems:
+
+- Each object retains its independent identity via a `$id` field.
+- References between objects use `{ "$ref-id": "<id>" }` — typed and navigable, but not embedded.
+- Shared objects are stored exactly once regardless of how many other objects reference them.
+- The entire graph can be validated and transmitted as a single unit.
+
+#### 8.12.2 Document Structure
+
+A graph document is a JSON object with the following top-level fields:
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `$oojs` | Yes | string | OOJS version string (e.g. `"1.0"`) |
+| `roots` | Yes | array | Entry-point objects of the graph |
+| `objects` | No | object | Map of `"$id" → object` for all non-root objects |
+
+Example — two employees sharing one department:
+
+```json
+{
+  "$oojs": "1.0",
+  "roots": [
+    {
+      "$type": "Employee",
+      "$id": "emp-alice",
+      "name": "Alice",
+      "employeeId": "E-001",
+      "department": { "$ref-id": "dept-eng" }
+    },
+    {
+      "$type": "Employee",
+      "$id": "emp-bob",
+      "name": "Bob",
+      "employeeId": "E-002",
+      "department": { "$ref-id": "dept-eng" }
+    }
+  ],
+  "objects": {
+    "dept-eng": {
+      "$type": "Department",
+      "$id": "dept-eng",
+      "name": "Engineering"
+    }
+  }
+}
+```
+
+Both `emp-alice` and `emp-bob` reference the same `dept-eng` object. The Department object is stored once and shared — a pattern that cannot be expressed with pure vertical embedding, which would require duplicating the embedded object in every parent.
+
+#### 8.12.3 Object Identity Fields
+
+Every object within a graph document carries two OOJS-reserved metadata fields:
+
+| Field | Description |
+|-------|-------------|
+| `$type` | Discriminator value — the type name as registered in the schema (equivalent to the schema's `discriminator` field in standalone instances) |
+| `$id` | Graph-scoped unique identifier for this object; used as the target of `$ref-id` references |
+
+`$id` values MUST be unique within the graph document. They are opaque string labels; they do not need to match any persistent storage key, but SHOULD correspond to the object's domain identifier when one exists (e.g. a database primary key or a slug).
+
+#### 8.12.4 References — `$ref-id`
+
+A reference to another object within the same graph document is expressed as a JSON object containing exactly one field:
+
+```json
+{ "$ref-id": "dept-eng" }
+```
+
+A `$ref-id` expression MAY appear in any property position where a TypeRef (`{ "type": "SomeType" }` in the schema) is expected. The value MUST be the `$id` of an object that appears in either `roots` or `objects` within the same graph document.
+
+Schema definition corresponding to the employee example above:
+
+```json
+"Employee": {
+  "properties": {
+    "employeeId": { "type": "string" },
+    "name":       { "type": "string" },
+    "department":  { "type": "Department" }
+  },
+  "required": ["employeeId", "name", "department"]
+},
+"Department": {
+  "properties": {
+    "name": { "type": "string" }
+  },
+  "required": ["name"]
+}
+```
+
+When validating a graph document, a `{ "$ref-id": "dept-eng" }` value in `Employee.department` is resolved to the `Department` object with `"$id": "dept-eng"` and validated against the `Department` type definition.
+
+#### 8.12.5 Validation of Graph Documents
+
+Validation of a graph document proceeds in two passes:
+
+**Pass 1 — Reference resolution**: Build an index of all objects in `roots` and `objects` keyed by their `$id`. Verify that every `$ref-id` target exists in the index; emit `UNRESOLVED_REFERENCE` errors for any that do not.
+
+**Pass 2 — Per-object validation**: For each object in `roots` and `objects`:
+
+1. Resolve `$type` to the corresponding type definition in the schema registry.
+2. Strip `$type` and `$id` from the property set before validation (they are document metadata, not schema-defined properties).
+3. For each property value that is a `$ref-id` expression, substitute the resolved target object and validate it against the property's declared TypeRef type.
+4. Validate all remaining properties against their declared property definitions.
+5. Report errors with paths that identify the object's position in the document (e.g. `roots[0]/department`).
+
+Cross-object consistency (bidirectional pairs, referential completeness) remains the application's responsibility, as it is in standalone-instance validation.
+
+#### 8.12.6 Comparison with Other Serialization Styles
+
+| Style | Objects per document | References | Embedding | Shared objects |
+|-------|---------------------|------------|-----------|----------------|
+| Standalone instances | One | Bare ID strings | No | N/A |
+| Vertical (embedded) | One root + owned children | N/A | Yes (deep nesting) | No — duplicated per parent |
+| Graph document | Many | `{ "$ref-id": "..." }` | No | Yes — stored once, referenced many times |
+
+Use a graph document when:
+- The domain model contains shared objects (many-to-many or fan-out relationships).
+- Atomic validation of the whole graph is required.
+- Avoiding duplication of embedded objects is important.
+- The full graph needs to be transmitted in one payload.
+
+Use standalone instances (with bare ID strings) when:
+- Objects are retrieved and validated independently (API pagination, lazy loading).
+- The associated objects live in a separate data store.
+- Graph completeness at document level is not required.
 
 ---
 

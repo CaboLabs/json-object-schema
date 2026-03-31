@@ -1,0 +1,46 @@
+{
+  "_comment": "Graph document example (§8.12). Two Employees share one Department. The Department is stored once in 'objects' and referenced by both Employees via { \"$ref-id\": \"...\" }. Schema: graph-document.oojs.json.",
+
+  "$oojs": "1.0",
+
+  "roots": [
+    {
+      "$type":      "Employee",
+      "$id":        "emp-alice",
+      "employeeId": "E-001",
+      "name":       "Alice",
+      "department": { "$ref-id": "dept-eng" }
+    },
+    {
+      "$type":      "Employee",
+      "$id":        "emp-bob",
+      "employeeId": "E-002",
+      "name":       "Bob",
+      "department": { "$ref-id": "dept-eng" }
+    },
+    {
+      "_comment":   "Employee referencing a Department in a different cost-center — shows cross-department reference within the same graph.",
+      "$type":      "Employee",
+      "$id":        "emp-carol",
+      "employeeId": "E-003",
+      "name":       "Carol",
+      "department": { "$ref-id": "dept-ops" },
+      "manager":    { "$ref-id": "emp-alice" }
+    }
+  ],
+
+  "objects": {
+    "dept-eng": {
+      "$type":      "Department",
+      "$id":        "dept-eng",
+      "departmentId": "D-01",
+      "name":       "Engineering"
+    },
+    "dept-ops": {
+      "$type":      "Department",
+      "$id":        "dept-ops",
+      "departmentId": "D-02",
+      "name":       "Operations"
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "$oojs": "1.0",
+  "$id":   "https://example.org/schemas/directionality",
+  "title": "Relationship Directionality",
+  "description": "Demonstrates unidirectional and bidirectional relationships (§8.11). Three domains: (1) unidirectional Invoice→Customer — only the Invoice side holds a reference; (2) bidirectional Person↔Car — both sides reference each other, Car.ownerId is the authoritative owning side; (3) mixed vertical+horizontal bidirectional — Report embeds Sections vertically while each Section carries a horizontal back-reference ID to its containing Report.",
+  "discriminator": "_type",
+
+  "types": {
+
+    "Customer": {
+      "title": "Customer",
+      "description": "Domain 1 — Unidirectional. TARGET side: Customer has no knowledge of which Invoices reference it. It can be updated without touching any Invoice.",
+      "properties": {
+        "customerId": { "type": "string", "minLength": 1, "description": "Unique identifier" },
+        "name":       { "type": "string", "minLength": 1 },
+        "email":      { "type": "string" }
+      },
+      "required": ["customerId", "name"]
+    },
+
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Domain 1 — Unidirectional. SOURCE side: holds a reference to its Customer via customerId. Navigation is possible only in one direction: Invoice → Customer. To find all Invoices for a Customer the application must query by customerId.",
+      "properties": {
+        "invoiceId":  { "type": "string", "minLength": 1 },
+        "amount":     { "type": "number", "minimum": 0 },
+        "dueDate":    { "type": "string", "format": "date" },
+        "customerId": {
+          "type": "string",
+          "description": "UNIDIRECTIONAL HAS-ONE HORIZONTAL → Customer. No back-reference exists on Customer."
+        }
+      },
+      "required": ["invoiceId", "amount", "customerId"]
+    },
+
+    "Person": {
+      "title": "Person",
+      "description": "Domain 2 — Bidirectional horizontal. INVERSE side of the Person↔Car relationship. Person.carIds is a convenience back-reference maintained by the application. Car.ownerId is the owning (authoritative) side; when the two ends disagree Car.ownerId takes precedence by convention.",
+      "properties": {
+        "personId": { "type": "string", "minLength": 1 },
+        "name":     { "type": "string", "minLength": 1 },
+        "carIds": {
+          "type":  "array",
+          "items": { "type": "string" },
+          "description": "BIDIRECTIONAL HAS-MANY HORIZONTAL ↔ Car (inverse side). The application must keep this in sync with Car.ownerId. OOJS does not enforce consistency between the two ends."
+        }
+      },
+      "required": ["personId", "name"]
+    },
+
+    "Car": {
+      "title": "Car",
+      "description": "Domain 2 — Bidirectional horizontal. OWNING side of the Person↔Car relationship. Car.ownerId is the authoritative source of truth for the ownership link.",
+      "properties": {
+        "carId":   { "type": "string", "minLength": 1 },
+        "make":    { "type": "string", "minLength": 1 },
+        "model":   { "type": "string", "minLength": 1 },
+        "ownerId": {
+          "type": "string",
+          "description": "BIDIRECTIONAL HAS-ONE HORIZONTAL ↔ Person (owning side). Navigate: Car → Person. Authoritative source of truth for the ownership relationship."
+        }
+      },
+      "required": ["carId", "make", "model", "ownerId"]
+    },
+
+    "Section": {
+      "title": "Section",
+      "description": "Domain 3 — Mixed vertical+horizontal bidirectional. Embedded inside Report (vertical has-many). Also carries a horizontal back-reference (reportId) so that a Section retrieved in isolation can navigate back to its containing Report. OOJS does not verify that section.reportId matches the ID of its enclosing Report.",
+      "properties": {
+        "sectionId": { "type": "string", "minLength": 1 },
+        "title":     { "type": "string", "minLength": 1 },
+        "body":      { "type": "string" },
+        "reportId": {
+          "type": "string",
+          "description": "BACK-REFERENCE (horizontal): the ID of the Report this Section belongs to. Enables Section → Report navigation. Must be kept consistent with the enclosing Report's reportId by the application."
+        }
+      },
+      "required": ["sectionId", "title", "reportId"]
+    },
+
+    "Report": {
+      "title": "Report",
+      "description": "Domain 3 — Mixed vertical+horizontal bidirectional. Embeds its Sections vertically (owning side). Each Section also carries a back-reference reportId to enable navigation from Section → Report without parsing the full Report document.",
+      "properties": {
+        "reportId": { "type": "string", "minLength": 1 },
+        "title":    { "type": "string", "minLength": 1 },
+        "sections": {
+          "type":  "array",
+          "items": { "type": "Section" },
+          "description": "HAS-MANY VERTICAL (owning side). Sections are embedded and fully validated here. The inverse navigation (Section → Report) is via Section.reportId."
+        }
+      },
+      "required": ["reportId", "title"]
+    }
+
+  }
+}
