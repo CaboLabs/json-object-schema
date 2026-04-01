@@ -2,7 +2,7 @@
 
 **Version:** 1.0-draft
 **Status:** Draft
-**Date:** 2026-03-29
+**Date:** 2026-03-31
 
 ---
 
@@ -166,17 +166,20 @@ An OOJS schema document MUST be a JSON object with the following members:
 
 ```
 {
-  "$oojs":        <string>,              REQUIRED
-  "$id":          <string>,              REQUIRED
-  "title":        <string>,              OPTIONAL
-  "description":  <string>,              OPTIONAL
-  "imports":      <object>,              OPTIONAL
-  "discriminator": <string>,             OPTIONAL, default: "_type"
-  "types":        <object>               REQUIRED
+  "$oojs":                <string>,      REQUIRED
+  "$id":                  <string>,      REQUIRED
+  "title":                <string>,      OPTIONAL
+  "description":          <string>,      OPTIONAL
+  "imports":              <object>,      OPTIONAL
+  "discriminator":        <string>,      OPTIONAL, default: "_type"
+  "additionalProperties": <boolean>,     OPTIONAL, default: false
+  "types":                <object>       REQUIRED
 }
 ```
 
 The `title` and `description` fields are adopted from [JSON-SCHEMA] with the same semantics: they are human-readable annotations and do not affect validation.
+
+`additionalProperties: false` (the default) enables closed-world validation: properties not declared in the effective property set are rejected (see §8.4). `additionalProperties: true` enables open-world mode: undeclared properties are silently ignored (see §8.5). This field applies to all types in the schema. Individual types cannot override it in v1.0.
 
 Additional members not defined in this specification SHOULD be ignored by conforming processors (open extension model at the document level).
 
@@ -210,7 +213,7 @@ An imported schema's types are accessible as `<alias>.<TypeName>` in property de
 
 The discriminator property name used by this schema. MUST be a valid JSON string. The default value is `"_type"`.
 
-The discriminator name MUST NOT collide with any property name declared in any type within the schema.
+The discriminator name MUST NOT be the same as any property name declared in any type within the schema (see also §5.5).
 
 ### 4.6 `types`
 
@@ -258,11 +261,9 @@ An abstract type MAY be used as the declared type of a property. In that case, o
 
 ### 5.4 `discriminatorValue`
 
-Overrides the discriminator value for this type. When absent, the discriminator value is the type name as declared in the `types` map.
+Overrides the discriminator value for this type. When absent, the discriminator value defaults to the type name as declared in the `types` map (or `"<alias>.<TypeName>"` for imported types; see §7.3).
 
-For a type imported via alias, the discriminator value follows the same alias-qualified form unless overridden.
-
-The discriminator value MUST be unique across all types in the combined registry (same schema + all imports). Two types with the same discriminator value MUST NOT appear in the same registry.
+The discriminator value MUST be unique across all types in the combined registry (same schema + all imports). Two types with the same discriminator value MUST NOT appear in the same registry (see §7.4 for the uniqueness rule and §10.2 for when it is enforced).
 
 ### 5.5 `properties`
 
@@ -314,8 +315,8 @@ All string constraint keywords are adopted from [JSON-SCHEMA] with identical sem
 
 | Keyword | Type | Constraint | JSON Schema ref |
 |---------|------|-----------|----------------|
-| `minLength` | integer ≥ 0 | `len(value) >= minLength` (Unicode code points) | [JSON-SCHEMA] §6.3.2 |
-| `maxLength` | integer ≥ 0 | `len(value) <= maxLength` | [JSON-SCHEMA] §6.3.3 |
+| `minLength` | integer ≥ 0 | `len(value) >= minLength` (Unicode code points) | [JSON-SCHEMA] §6.3.1 |
+| `maxLength` | integer ≥ 0 | `len(value) <= maxLength` | [JSON-SCHEMA] §6.3.2 |
 | `pattern` | string | ECMA-262 [ECMA-262] regex; value must produce a match | [JSON-SCHEMA] §6.3.3 |
 | `enum` | non-empty array of strings | value must equal one element | [JSON-SCHEMA] §6.1.2 |
 | `format` | string | Semantic hint; informational in v1.0 | [JSON-SCHEMA] §7.3 |
@@ -419,10 +420,11 @@ Discriminator values MUST be unique across the combined set of all types in all 
 
 Given an instance `I` and a target type `T`:
 
-1. Read `I[discriminator]` → value `D`.
-2. Locate type `C` in the registry where `C.discriminatorValue == D`.
-3. Verify that `C` is `T` or a subtype of `T` (C appears in the subtree rooted at T in the type hierarchy).
-4. Validate `I` against `C`.
+1. Read `I[discriminator]` → value `D`. If absent or not a string, report an error and stop.
+2. Locate type `C` in the registry where `C.discriminatorValue == D`. If not found, report `UNKNOWN_TYPE`.
+3. Verify that `C` is not abstract. If `C.abstract == true`, report `ABSTRACT_TYPE`.
+4. Verify that `C` is `T` or a subtype of `T` (C appears in the subtree rooted at T in the type hierarchy). If not, report `TYPE_MISMATCH`.
+5. Validate `I` against `C`.
 
 The complexity of step 2 is O(1) when the registry indexes types by discriminator value (RECOMMENDED).
 
@@ -450,7 +452,9 @@ By default, OOJS operates in closed-world mode: a property present in the instan
 
 ### 8.5 Open-World Mode
 
-A schema MAY declare `"additionalProperties": true` at the schema level (not on individual types) to enable open-world mode. In open-world mode, unknown properties are silently ignored.
+A schema MAY declare `"additionalProperties": true` at the schema level (see §4.1) to enable open-world mode. In open-world mode, properties present in an instance but not declared in the type's effective property set are silently ignored rather than rejected.
+
+The `additionalProperties` field is a schema-level setting; it applies uniformly to all types in the schema and cannot be overridden per type in v1.0. When absent it defaults to `false` (closed-world). The validation algorithm refers to this as `schema.closedWorld`, where `closedWorld` is `true` when `additionalProperties` is `false` (the default) and `false` when `additionalProperties` is `true`.
 
 ---
 
@@ -843,9 +847,11 @@ A graph document is a JSON object with the following top-level fields:
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
-| `$oojs` | Yes | string | OOJS version string (e.g. `"1.0"`) |
-| `roots` | Yes | array | Entry-point objects of the graph |
-| `objects` | No | object | Map of `"$id" → object` for all non-root objects |
+| `$oojs` | Yes | string | OOJS version string (e.g. `"1.0"`). The same version as the schema's `$oojs` field (§4.2); both refer to the OOJS specification version. |
+| `roots` | Yes | array | Entry-point objects of the graph. Every object MUST have a `$id` and `$type`. |
+| `objects` | No | object | Map of `"$id" → object` for non-root objects. When absent it is treated as empty. |
+
+`$id` values MUST be unique across the entire graph document — including both `roots` and `objects`. A `$ref-id` MAY target any object regardless of whether it appears in `roots` or `objects`.
 
 Example — two employees sharing one department:
 
@@ -886,10 +892,12 @@ Every object within a graph document carries two OOJS-reserved metadata fields:
 
 | Field | Description |
 |-------|-------------|
-| `$type` | Discriminator value — the type name as registered in the schema (equivalent to the schema's `discriminator` field in standalone instances) |
-| `$id` | Graph-scoped unique identifier for this object; used as the target of `$ref-id` references |
+| `$type` | The type name of this object, as registered in the schema. **In graph documents the discriminator key is always the literal string `$type`**, regardless of the schema's `discriminator` setting (which applies only to standalone instances). |
+| `$id` | Graph-scoped unique identifier for this object; used as the target of `$ref-id` references. |
 
-`$id` values MUST be unique within the graph document. They are opaque string labels; they do not need to match any persistent storage key, but SHOULD correspond to the object's domain identifier when one exists (e.g. a database primary key or a slug).
+`$id` values MUST be unique within the graph document. They are opaque string labels; they do not need to match any persistent storage key, but SHOULD correspond to the object's domain identifier when one exists (e.g., a database primary key or a slug).
+
+> **`$id` naming note**: The `$id` field on a graph-document object is a graph-scoped identity label. It is unrelated to the `$id` field on a schema document (§4.3), which is a schema URI. The two `$id` fields appear in different contexts and are never confused by a processor.
 
 #### 8.12.4 References — `$ref-id`
 
@@ -926,15 +934,15 @@ When validating a graph document, a `{ "$ref-id": "dept-eng" }` value in `Employ
 
 Validation of a graph document proceeds in two passes:
 
-**Pass 1 — Reference resolution**: Build an index of all objects in `roots` and `objects` keyed by their `$id`. Verify that every `$ref-id` target exists in the index; emit `UNRESOLVED_REFERENCE` errors for any that do not.
+**Pass 1 — Reference resolution**: Build an index of all objects in `roots` (and `objects` if present) keyed by their `$id`. A `$ref-id` may target any object in `roots` or `objects`. Verify that every `$ref-id` target exists in the index; emit `UNRESOLVED_REFERENCE` (§9.7) errors for any that do not.
 
-**Pass 2 — Per-object validation**: For each object in `roots` and `objects`:
+**Pass 2 — Per-object validation**: For each object in `roots` (and `objects` if present), in any order:
 
-1. Resolve `$type` to the corresponding type definition in the schema registry.
-2. Strip `$type` and `$id` from the property set before validation (they are document metadata, not schema-defined properties).
-3. For each property value that is a `$ref-id` expression, substitute the resolved target object and validate it against the property's declared TypeRef type.
-4. Validate all remaining properties against their declared property definitions.
-5. Report errors with paths that identify the object's position in the document (e.g. `roots[0]/department`).
+1. Read `$type` to determine the type name, then look up the corresponding type definition in the schema registry. If `$type` is absent or the type is unknown, emit the appropriate error and skip this object.
+2. Construct a synthetic standalone instance by copying the object, replacing `$type` with the schema's discriminator key (e.g., `"_type": "Employee"` if the schema's discriminator is `"_type"`), and removing `$id`. This synthetic instance is what the standard validation algorithm (§9.2) receives.
+3. Before invoking §9.2, substitute each `$ref-id` expression in the synthetic instance's properties: look up the target object in the index and type-check it against the property's declared TypeRef type. Do **not** recursively re-validate the target object inline — it will be (or has been) validated independently in this same Pass 2 loop. This approach makes cycle handling implicit: no visited-set tracking is required.
+4. Run the standard validation algorithm (§9.2) on the synthetic instance.
+5. Report errors with paths that identify the object by `$id` and position (e.g. `roots[0]/$id=emp-alice/department`).
 
 Cross-object consistency (bidirectional pairs, referential completeness) remains the application's responsibility, as it is in standalone-instance validation.
 
@@ -965,11 +973,13 @@ A **cycle** (also called a loop or circular reference) occurs when a chain of re
 
 #### 8.13.1 Cycles in the Schema (Class Model)
 
-A cycle in the schema arises when the type-reference chain contains a type that references itself, directly or indirectly:
+A cycle in the schema arises when the type-reference chain in *property definitions* contains a type that references itself, directly or indirectly:
 
 - **Self-referential**: `Employee.manager` is a TypeRef to `Employee`. An employee can have a manager who is also an employee.
 - **Two-type cycle**: `Employee.department` is a TypeRef to `Department`, and `Department.head` is a TypeRef to `Employee`. Each type references the other.
 - **N-type cycle**: `A.b` → `B`, `B.c` → `C`, `C.a` → `A`. The chain closes after N hops.
+
+> **Important distinction**: §3.4 prohibits cycles in the *inheritance* (`extends`) chain — a type must not be its own ancestor. That prohibition does not apply to TypeRef properties. TypeRef properties form a directed graph that may contain cycles; the `extends` relation forms a directed forest (no cycles). These two graphs are independent.
 
 These are all valid OOJS schemas. A schema parser processes only the type *names* (strings) when loading type definitions; it never expands a TypeRef recursively during loading. As a result schema loading always terminates regardless of how many cycles the type graph contains.
 
@@ -1024,9 +1034,9 @@ In a graph document (§8.12), objects are connected by `$ref-id` references. Tho
 
 Here Alice's manager is Bob and Bob's manager is Alice — a two-node cycle. Longer cycles (A → B → C → A) are equally valid.
 
-OOJS validators MUST handle cycles in graph document instances without entering an infinite loop. The standard technique is to maintain a **visited set** of `$id` values during Pass 2 of graph document validation (§8.12.5): when a `$ref-id` target is encountered whose `$id` is already in the visited set for the current traversal path, the validator skips re-validating that object (it has already been validated or is currently being validated) and continues without error. This ensures validation terminates in O(N) time where N is the number of objects in the graph, regardless of cycle depth or count.
+OOJS validators MUST handle cycles in graph document instances without entering an infinite loop. Cycle safety is achieved structurally by the validation algorithm (§8.12.5 Pass 2): each object in the graph is validated exactly once in the top-level loop, and `$ref-id` expressions are only type-checked against their target's `$type` — the target object is never re-validated inline. Because no recursive traversal of `$ref-id` references occurs during validation, cycles require no visited-set tracking and impose no special handling. Validation terminates in O(N) time where N is the number of objects in the graph, regardless of cycle depth or count.
 
-> **Note**: cycles are only possible in horizontal relationships (§8.9) and graph documents. Vertical (embedded) relationships cannot form cycles because JSON itself cannot represent a value that contains itself; the object tree is always a DAG.
+> **Note**: cycles are only possible in horizontal relationships (§8.9) and graph documents. Vertical (embedded) relationships cannot form cycles because JSON itself cannot represent a value that contains itself — a JSON value tree is always a DAG.
 
 #### 8.13.3 Cycles in Standalone Instances
 
@@ -1049,10 +1059,12 @@ A `ValidationResult` is either `valid` or a non-empty list of `ValidationError` 
 
 **Phase 1 — Discriminator resolution**
 
+Paths in error objects follow JSON Pointer [RFC6901] syntax. The root of the instance is represented by the empty string `""`. A property `foo` at the root is `"/foo"`.
+
 ```
 D = I[schema.discriminator]
 if D is absent:
-    error(path="/", code=MISSING_DISCRIMINATOR)
+    error(path="", code=MISSING_DISCRIMINATOR)
 if D is not a string:
     error(path="/" + schema.discriminator, code=INVALID_DISCRIMINATOR_TYPE)
 C = R.lookupByDiscriminatorValue(D)
@@ -1070,7 +1082,7 @@ if not isSubtypeOf(C, T, R):
 ```
 for name in effectiveRequired(C):
     if name not in I:
-        error(path="/", code=MISSING_REQUIRED, message="missing required property: name")
+        error(path="/" + name, code=MISSING_REQUIRED, message="missing required property: name")
 ```
 
 **Phase 3 — Property validation**
@@ -1169,7 +1181,7 @@ This check is O(depth of hierarchy) and terminates because the hierarchy is acyc
 - If T has no supertype: T.properties
 - Else: effectivePropertySet(T.supertype) ∪ T.properties
 
-Properties from the supertype take precedence in the union key set (subtype cannot re-declare; this is enforced at schema load time, not at validation time).
+The union is well-defined because §5.5 prohibits a subtype from re-declaring a property already declared in any ancestor. This constraint is enforced at schema load time; the validator may assume no key collisions exist in the effective property set.
 
 ### 9.6 Validation Modes
 
@@ -1204,6 +1216,7 @@ The default mode is RECOMMENDED to be full. Implementations SHOULD allow callers
 | `ARRAY_TOO_SHORT` | Array length is below `minItems` |
 | `ARRAY_TOO_LONG` | Array length is above `maxItems` |
 | `ARRAY_DUPLICATE_ITEMS` | Array contains duplicate items but `uniqueItems` is true |
+| `UNRESOLVED_REFERENCE` | A `$ref-id` value in a graph document does not match any `$id` in the same document (§8.12.5) |
 
 ---
 
@@ -1234,7 +1247,7 @@ Two schemas MAY import each other (A imports B, B imports A) provided that:
 
 ### 10.4 Cross-Schema Type References
 
-A property of type `"core.Entity"` refers to the type named `Entity` in the schema loaded under the alias `core`. The discriminator value for that type is determined by the `core` schema's type definition (either `Entity` or the `discriminatorValue` override, prefixed with `core.` unless overridden).
+A property of type `"core.Entity"` refers to the type named `Entity` in the schema loaded under the alias `core`. The discriminator value for that type follows the rule in §7.3: if the `core` schema's `Entity` type definition sets `discriminatorValue`, that value is used as-is; otherwise the discriminator value defaults to `"core.Entity"` (the alias followed by a dot followed by the type name as declared in the source schema). The prefix used is the **local alias** as declared in the importing schema's `imports` map, not any canonical prefix from the source schema.
 
 ---
 
@@ -1262,7 +1275,7 @@ The following strings MUST NOT be used as type names:
 
 `array`, `string`, `integer`, `number`, `boolean`, `null`
 
-These are reserved primitive type identifiers.
+These are reserved primitive type identifiers. Although the type name regex (§11.1) already requires an uppercase first character and therefore structurally excludes all of these lowercase strings, they are listed here explicitly to document the reserved set and to guard against any future extension that might relax the regex.
 
 ### 11.5 Case Sensitivity
 
@@ -1286,6 +1299,8 @@ A Core Validator:
 - MUST implement both fail-fast and full validation modes (§9.6).
 - MUST support all primitive types and constraints (§6.1).
 - MUST implement closed-world validation by default (§8.4).
+- MUST support open-world mode (`additionalProperties: true`) per §8.5.
+- MUST validate graph documents per §8.12.
 
 **Conformance Level 2 — Compatible Processor**
 
@@ -1346,7 +1361,7 @@ Notes:
 
 ### 13.3 Abstract Types
 
-Abstract types are marked with a JSON Schema `if`/`then`/`else` pattern that rejects instances whose discriminator equals the abstract type's own value:
+Abstract types are marked with a JSON Schema `if`/`then` pattern that rejects instances whose discriminator equals the abstract type's own value:
 
 ```json
 "ClinicalEntry": {
@@ -1360,11 +1375,13 @@ Abstract types are marked with a JSON Schema `if`/`then`/`else` pattern that rej
 }
 ```
 
+In this pattern, `"not": {}` always fails (since `{}` always validates to true), causing any instance that claims `_type: "ClinicalEntry"` to be rejected. An `else` branch is not needed — instances that do not match the `if` condition are not affected by the `then`.
+
 Alternatively, processors MAY omit the abstract guard in the generated schema and rely on discriminated-union routing to never route to the abstract type directly. This is semantically equivalent when all subtypes are enumerated.
 
 ### 13.4 Polymorphic Type Reference → `oneOf` + `$ref`
 
-A property `"type": "ClinicalEntry"` becomes:
+A property `"type": "ClinicalEntry"` (where `ClinicalEntry` has concrete subtypes `Observation`, `Diagnosis`, and `Procedure`) becomes:
 
 ```json
 {
@@ -1372,7 +1389,17 @@ A property `"type": "ClinicalEntry"` becomes:
     { "$ref": "#/$defs/Observation" },
     { "$ref": "#/$defs/Diagnosis" },
     { "$ref": "#/$defs/Procedure" }
-  ],
+  ]
+}
+```
+
+The `oneOf` list includes all concrete subtypes of `ClinicalEntry` known at generation time. The emitted JSON Schema is valid for the closed set of schemas loaded when the Compatible Processor runs; adding new subtypes in a later schema load requires re-generating the JSON Schema output.
+
+Processors targeting OpenAPI 3.x tooling MAY additionally emit a `discriminator` object as a hint for tooling that supports it:
+
+```json
+{
+  "oneOf": [ ... ],
   "discriminator": {
     "propertyName": "_type",
     "mapping": {
@@ -1384,7 +1411,7 @@ A property `"type": "ClinicalEntry"` becomes:
 }
 ```
 
-The `discriminator` object is emitted as an OpenAPI 3.x extension hint. Processors targeting pure JSON Schema 2020-12 MAY omit it.
+The `discriminator` object is an OpenAPI 3.x extension [OPENAPI] and is not part of JSON Schema 2020-12. Emitting it does not affect the JSON Schema validity of the output document; it is purely advisory for OpenAPI tooling.
 
 ---
 
@@ -1405,9 +1432,15 @@ This specification registers the following media type:
 
 ## 15. Security Considerations
 
-### 15.1 Recursive Schemas
+### 15.1 Recursive Schemas and Cycle Safety
 
-Schemas with recursive type references (a type that directly or indirectly has a property of its own type) are valid and common (e.g., tree structures). Validators MUST implement cycle detection in the instance being validated to avoid infinite recursion. A maximum recursion depth SHOULD be configurable.
+Schemas with recursive type references — where a type directly or indirectly has a property of its own type — are valid and common (e.g., tree structures, self-referential hierarchies).
+
+For **standalone instances** (§8.1), the JSON value is always a finite tree; there is no mechanism for a JSON value to contain itself. Recursive validation of TypeRef properties therefore always terminates naturally with the depth of nesting in the instance.
+
+For **graph documents** (§8.12), instance cycles are possible via `$ref-id` references. The validation algorithm in §8.12.5 handles cycles safely without any visited-set tracking: each object is validated exactly once in Pass 2, and `$ref-id` targets are type-checked but not recursively re-validated inline. Implementations that deviate from this architecture and instead traverse `$ref-id` references recursively during validation MUST implement cycle detection (a visited set of `$id` values) to avoid infinite loops.
+
+A maximum nesting depth for recursive TypeRef validation SHOULD be configurable in implementations that process standalone instances with deeply nested embedded objects.
 
 ### 15.2 Schema Injection
 
