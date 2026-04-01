@@ -1,0 +1,66 @@
+{
+  "$oojs": "1.0",
+  "$id":   "https://example.org/schemas/relationships",
+  "title": "Relationship Combinations",
+  "description": "Demonstrates all four combinations of cardinality × structure (§8.7). A single Employee type carries one property for each quadrant of the matrix: has-one vertical, has-many vertical, has-one horizontal, has-many horizontal.",
+  "discriminator": "_type",
+
+  "types": {
+
+    "Address": {
+      "title": "Address",
+      "description": "Embedded value object. No independent identity — exists only inside its owning Employee. Used as the target of a HAS-ONE VERTICAL relationship.",
+      "properties": {
+        "street":  { "type": "string", "minLength": 1 },
+        "city":    { "type": "string", "minLength": 1 },
+        "country": { "type": "string", "minLength": 1 }
+      },
+      "required": ["street", "city"]
+    },
+
+    "Badge": {
+      "title": "Badge",
+      "description": "Embedded value object. Each Employee can carry multiple badges. Used as the item type of a HAS-MANY VERTICAL relationship.",
+      "properties": {
+        "badgeId": { "type": "string", "minLength": 1 },
+        "label":   { "type": "string", "minLength": 1 },
+        "level":   { "type": "integer", "minimum": 1, "maximum": 5 }
+      },
+      "required": ["badgeId", "label"]
+    },
+
+    "Employee": {
+      "title": "Employee",
+      "description": "Carries all four relationship patterns from §8.7 in a single type. address: HAS-ONE VERTICAL (embedded Address). badges: HAS-MANY VERTICAL (embedded Badge array). departmentId: HAS-ONE HORIZONTAL (Department referenced by ID). projectIds: HAS-MANY HORIZONTAL (Projects referenced by ID array).",
+      "properties": {
+        "employeeId": { "type": "string", "minLength": 1, "description": "Unique identifier" },
+        "name":       { "type": "string", "minLength": 1 },
+
+        "address": {
+          "type": "Address",
+          "description": "HAS-ONE VERTICAL (§8.7, §8.8): the Address object is embedded directly in this Employee's JSON and validated as part of it. The Address has no existence outside this document."
+        },
+
+        "badges": {
+          "type":  "array",
+          "items": { "type": "Badge" },
+          "description": "HAS-MANY VERTICAL (§8.7, §8.8): each Badge is embedded directly in this Employee's JSON. Zero or more badges are allowed."
+        },
+
+        "departmentId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "HAS-ONE HORIZONTAL (§8.7, §8.9): references the owning Department by its identifier. The Department object is NOT embedded — it lives in a separate document or data store."
+        },
+
+        "projectIds": {
+          "type":  "array",
+          "items": { "type": "string" },
+          "description": "HAS-MANY HORIZONTAL (§8.7, §8.9): references zero or more Projects by their identifiers. Project objects are NOT embedded."
+        }
+      },
+      "required": ["employeeId", "name", "departmentId"]
+    }
+
+  }
+}

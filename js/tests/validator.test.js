@@ -1490,3 +1490,254 @@ test('GraphDocument: root missing $type produces error', () => {
   assertNotEmpty(errs);
   assert(hasCode(errs, ErrorCode.MISSING_DISCRIMINATOR));
 });
+
+// ---------------------------------------------------------------------------
+// §8.7 — Cardinality × Structure combinations
+// ---------------------------------------------------------------------------
+
+function relationshipsSchema() {
+  return {
+    '$oojs': '1.0', '$id': 'https://example.org/schemas/relationships',
+    discriminator: '_type',
+    types: {
+      Address: {
+        properties: {
+          street:  { type: 'string', minLength: 1 },
+          city:    { type: 'string', minLength: 1 },
+          country: { type: 'string', minLength: 1 },
+        },
+        required: ['street', 'city'],
+      },
+      Badge: {
+        properties: {
+          badgeId: { type: 'string', minLength: 1 },
+          label:   { type: 'string', minLength: 1 },
+          level:   { type: 'integer', minimum: 1, maximum: 5 },
+        },
+        required: ['badgeId', 'label'],
+      },
+      Employee: {
+        properties: {
+          employeeId:   { type: 'string', minLength: 1 },
+          name:         { type: 'string', minLength: 1 },
+          address:      { type: 'Address' },
+          badges:       { type: 'array', items: { type: 'Badge' } },
+          departmentId: { type: 'string', minLength: 1 },
+          projectIds:   { type: 'array', items: { type: 'string' } },
+        },
+        required: ['employeeId', 'name', 'departmentId'],
+      },
+    },
+  };
+}
+
+// --- has-one vertical ---
+
+test('RelCardinality: has-one vertical valid embedded object', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-001', name: 'Alice', departmentId: 'dept-eng',
+    address: { _type: 'Address', street: '1 Main St', city: 'Springfield' },
+  };
+  assertEmpty(validate(emp, schema.types.Employee, schema, r));
+});
+
+test('RelCardinality: has-one vertical optional may be absent', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = { _type: 'Employee', employeeId: 'emp-002', name: 'Bob', departmentId: 'dept-ops' };
+  assertEmpty(validate(emp, schema.types.Employee, schema, r));
+});
+
+test('RelCardinality: has-one vertical missing required field in embedded object', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-003', name: 'Carol', departmentId: 'dept-eng',
+    address: { _type: 'Address', city: 'Springfield' }, // street absent
+  };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.MISSING_REQUIRED));
+});
+
+test('RelCardinality: has-one vertical type mismatch — wrong embedded type', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-004', name: 'Dave', departmentId: 'dept-eng',
+    address: { _type: 'Badge', badgeId: 'b-1', label: 'X' },
+  };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.TYPE_MISMATCH));
+});
+
+test('RelCardinality: has-one vertical must be object not string', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-005', name: 'Eve', departmentId: 'dept-eng',
+    address: 'not-an-object',
+  };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.TYPE_MISMATCH));
+});
+
+// --- has-many vertical ---
+
+test('RelCardinality: has-many vertical valid multiple items', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-010', name: 'Frank', departmentId: 'dept-eng',
+    badges: [
+      { _type: 'Badge', badgeId: 'b-1', label: 'Safety', level: 3 },
+      { _type: 'Badge', badgeId: 'b-2', label: 'Leader' },
+    ],
+  };
+  assertEmpty(validate(emp, schema.types.Employee, schema, r));
+});
+
+test('RelCardinality: has-many vertical valid empty array', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = { _type: 'Employee', employeeId: 'emp-011', name: 'Grace', departmentId: 'dept-hr', badges: [] };
+  assertEmpty(validate(emp, schema.types.Employee, schema, r));
+});
+
+test('RelCardinality: has-many vertical missing required field in one item', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-012', name: 'Henry', departmentId: 'dept-eng',
+    badges: [
+      { _type: 'Badge', badgeId: 'b-ok', label: 'OK' },
+      { _type: 'Badge', badgeId: 'b-bad' }, // label absent
+    ],
+  };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.MISSING_REQUIRED));
+});
+
+test('RelCardinality: has-many vertical constraint violation in one item', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-013', name: 'Iris', departmentId: 'dept-eng',
+    badges: [{ _type: 'Badge', badgeId: 'b-1', label: 'Expert', level: 10 }], // max 5
+  };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.ABOVE_MAXIMUM));
+});
+
+test('RelCardinality: has-many vertical must be array not object', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-014', name: 'Jack', departmentId: 'dept-eng',
+    badges: { _type: 'Badge', badgeId: 'b-1', label: 'X' },
+  };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.TYPE_MISMATCH));
+});
+
+// --- has-one horizontal ---
+
+test('RelCardinality: has-one horizontal valid string id', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = { _type: 'Employee', employeeId: 'emp-020', name: 'Karen', departmentId: 'dept-eng' };
+  assertEmpty(validate(emp, schema.types.Employee, schema, r));
+});
+
+test('RelCardinality: has-one horizontal required must be present', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = { _type: 'Employee', employeeId: 'emp-021', name: 'Leo' }; // departmentId absent
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.MISSING_REQUIRED));
+});
+
+test('RelCardinality: has-one horizontal must be string not integer', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = { _type: 'Employee', employeeId: 'emp-022', name: 'Mia', departmentId: 42 };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.TYPE_MISMATCH));
+});
+
+test('RelCardinality: has-one horizontal must be string not array', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = { _type: 'Employee', employeeId: 'emp-023', name: 'Nick', departmentId: ['dept-eng'] };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.TYPE_MISMATCH));
+});
+
+test('RelCardinality: has-one horizontal minLength enforced — empty string rejected', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = { _type: 'Employee', employeeId: 'emp-024', name: 'Olivia', departmentId: '' };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.STRING_TOO_SHORT));
+});
+
+// --- has-many horizontal ---
+
+test('RelCardinality: has-many horizontal valid multiple ids', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-030', name: 'Paul', departmentId: 'dept-eng',
+    projectIds: ['proj-alpha', 'proj-beta', 'proj-gamma'],
+  };
+  assertEmpty(validate(emp, schema.types.Employee, schema, r));
+});
+
+test('RelCardinality: has-many horizontal valid empty array', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-031', name: 'Quinn', departmentId: 'dept-eng',
+    projectIds: [],
+  };
+  assertEmpty(validate(emp, schema.types.Employee, schema, r));
+});
+
+test('RelCardinality: has-many horizontal item must be string not integer', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-032', name: 'Rose', departmentId: 'dept-eng',
+    projectIds: ['proj-ok', 99],
+  };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.TYPE_MISMATCH));
+});
+
+test('RelCardinality: has-many horizontal must be array not bare string', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-033', name: 'Sam', departmentId: 'dept-eng',
+    projectIds: 'proj-alpha',
+  };
+  const errs = validate(emp, schema.types.Employee, schema, r);
+  assert(hasCode(errs, ErrorCode.TYPE_MISMATCH));
+});
+
+test('RelCardinality: all four quadrants populated simultaneously', () => {
+  const r = new Registry();
+  const schema = r.loadDict(relationshipsSchema());
+  const emp = {
+    _type: 'Employee', employeeId: 'emp-040', name: 'Tina',
+    address: { _type: 'Address', street: '5 Oak Rd', city: 'Shelbyville' },
+    badges: [
+      { _type: 'Badge', badgeId: 'b-1', label: 'Expert', level: 4 },
+      { _type: 'Badge', badgeId: 'b-2', label: 'Mentor' },
+    ],
+    departmentId: 'dept-rd',
+    projectIds: ['proj-x', 'proj-y'],
+  };
+  assertEmpty(validate(emp, schema.types.Employee, schema, r));
+});

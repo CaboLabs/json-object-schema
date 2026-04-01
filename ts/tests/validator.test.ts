@@ -1250,3 +1250,257 @@ describe('GraphDocument', () => {
     expect(hasCode(errs, ErrorCode.MISSING_DISCRIMINATOR)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// §8.7 — Cardinality × Structure (relationships.oojs.json)
+// ---------------------------------------------------------------------------
+
+function relationshipsSchema() {
+  return JSON.parse(
+    readFileSync(join(EXAMPLES, 'relationships.oojs.json'), 'utf8'),
+  );
+}
+
+function relationshipsInstances() {
+  return JSON.parse(
+    readFileSync(join(EXAMPLES, 'relationships-instances.json'), 'utf8'),
+  );
+}
+
+describe('RelationshipsCardinality', () => {
+  // --- example file round-trips ---
+
+  it('example file: all valid instances pass', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const { valid } = relationshipsInstances();
+    for (const inst of valid) {
+      const { _comment: _, ...clean } = inst as Record<string, unknown>;
+      const errs = validate(clean, schema.types[(clean as any)._type], schema, r);
+      expect(errs).toEqual([]);
+    }
+  });
+
+  it('example file: all invalid instances fail', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const { invalid } = relationshipsInstances();
+    for (const inst of invalid) {
+      const { _comment: _, ...clean } = inst as Record<string, unknown>;
+      const typeName = (clean as any)._type ?? 'Employee';
+      const errs = validate(clean, schema.types[typeName], schema, r);
+      expect(errs.length).toBeGreaterThan(0);
+    }
+  });
+
+  // --- has-one vertical (address → Address embedded) ---
+
+  it('has-one vertical: valid embedded object', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-001', name: 'Alice', departmentId: 'dept-eng',
+      address: { _type: 'Address', street: '1 Main St', city: 'Springfield' },
+    };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('has-one vertical: optional, may be absent', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = { _type: 'Employee', employeeId: 'emp-002', name: 'Bob', departmentId: 'dept-ops' };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('has-one vertical: missing required field in embedded object', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-003', name: 'Carol', departmentId: 'dept-eng',
+      address: { _type: 'Address', city: 'Springfield' }, // street absent
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.MISSING_REQUIRED)).toBe(true);
+  });
+
+  it('has-one vertical: type mismatch — wrong embedded type', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-004', name: 'Dave', departmentId: 'dept-eng',
+      address: { _type: 'Badge', badgeId: 'b-1', label: 'X' },
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('has-one vertical: must be object, not string', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-005', name: 'Eve', departmentId: 'dept-eng',
+      address: 'not-an-object',
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  // --- has-many vertical (badges → Badge[] embedded) ---
+
+  it('has-many vertical: valid multiple items', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-010', name: 'Frank', departmentId: 'dept-eng',
+      badges: [
+        { _type: 'Badge', badgeId: 'b-1', label: 'Safety', level: 3 },
+        { _type: 'Badge', badgeId: 'b-2', label: 'Leader' },
+      ],
+    };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('has-many vertical: valid empty array', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = { _type: 'Employee', employeeId: 'emp-011', name: 'Grace', departmentId: 'dept-hr', badges: [] };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('has-many vertical: missing required field in one item', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-012', name: 'Henry', departmentId: 'dept-eng',
+      badges: [
+        { _type: 'Badge', badgeId: 'b-ok', label: 'OK' },
+        { _type: 'Badge', badgeId: 'b-bad' }, // label absent
+      ],
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.MISSING_REQUIRED)).toBe(true);
+  });
+
+  it('has-many vertical: constraint violation in one item', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-013', name: 'Iris', departmentId: 'dept-eng',
+      badges: [{ _type: 'Badge', badgeId: 'b-1', label: 'Expert', level: 10 }], // max 5
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.ABOVE_MAXIMUM)).toBe(true);
+  });
+
+  it('has-many vertical: must be array, not object', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-014', name: 'Jack', departmentId: 'dept-eng',
+      badges: { _type: 'Badge', badgeId: 'b-1', label: 'X' },
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  // --- has-one horizontal (departmentId → string ID) ---
+
+  it('has-one horizontal: valid string id', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = { _type: 'Employee', employeeId: 'emp-020', name: 'Karen', departmentId: 'dept-eng' };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('has-one horizontal: required, must be present', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = { _type: 'Employee', employeeId: 'emp-021', name: 'Leo' }; // departmentId absent
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.MISSING_REQUIRED)).toBe(true);
+  });
+
+  it('has-one horizontal: must be string, not integer', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = { _type: 'Employee', employeeId: 'emp-022', name: 'Mia', departmentId: 42 };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('has-one horizontal: must be string, not array', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = { _type: 'Employee', employeeId: 'emp-023', name: 'Nick', departmentId: ['dept-eng'] };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('has-one horizontal: minLength enforced — empty string rejected', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = { _type: 'Employee', employeeId: 'emp-024', name: 'Olivia', departmentId: '' };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.STRING_TOO_SHORT)).toBe(true);
+  });
+
+  // --- has-many horizontal (projectIds → string[] IDs) ---
+
+  it('has-many horizontal: valid multiple ids', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-030', name: 'Paul', departmentId: 'dept-eng',
+      projectIds: ['proj-alpha', 'proj-beta', 'proj-gamma'],
+    };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('has-many horizontal: valid empty array', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-031', name: 'Quinn', departmentId: 'dept-eng',
+      projectIds: [],
+    };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('has-many horizontal: item must be string, not integer', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-032', name: 'Rose', departmentId: 'dept-eng',
+      projectIds: ['proj-ok', 99],
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('has-many horizontal: must be array, not bare string', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-033', name: 'Sam', departmentId: 'dept-eng',
+      projectIds: 'proj-alpha',
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('all four quadrants populated simultaneously', () => {
+    const r = new Registry();
+    const schema = r.loadDict(relationshipsSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'emp-040', name: 'Tina',
+      address: { _type: 'Address', street: '5 Oak Rd', city: 'Shelbyville' },
+      badges: [
+        { _type: 'Badge', badgeId: 'b-1', label: 'Expert', level: 4 },
+        { _type: 'Badge', badgeId: 'b-2', label: 'Mentor' },
+      ],
+      departmentId: 'dept-rd',
+      projectIds: ['proj-x', 'proj-y'],
+    };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+});

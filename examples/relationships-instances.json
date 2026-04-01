@@ -1,0 +1,121 @@
+{
+  "_comment": "Valid and invalid instances for relationships.oojs.json — all four combinations of cardinality × structure (§8.7).",
+
+  "valid": [
+
+    {
+      "_comment": "All four relationships present. address: has-one vertical (embedded). badges: has-many vertical (embedded array). departmentId: has-one horizontal (ID ref). projectIds: has-many horizontal (ID array).",
+      "_type":        "Employee",
+      "employeeId":   "emp-001",
+      "name":         "Alice",
+      "address": {
+        "_type":   "Address",
+        "street":  "1 Main St",
+        "city":    "Springfield",
+        "country": "US"
+      },
+      "badges": [
+        { "_type": "Badge", "badgeId": "bdg-001", "label": "Safety", "level": 3 },
+        { "_type": "Badge", "badgeId": "bdg-002", "label": "Leadership" }
+      ],
+      "departmentId": "dept-eng",
+      "projectIds":   ["proj-alpha", "proj-beta"]
+    },
+
+    {
+      "_comment": "Only required fields: employeeId, name, departmentId. The two optional relationships (address, badges, projectIds) may be omitted.",
+      "_type":        "Employee",
+      "employeeId":   "emp-002",
+      "name":         "Bob",
+      "departmentId": "dept-ops"
+    },
+
+    {
+      "_comment": "Has-one vertical present, has-many vertical empty array, has-many horizontal with one entry.",
+      "_type":        "Employee",
+      "employeeId":   "emp-003",
+      "name":         "Carol",
+      "address": {
+        "_type":  "Address",
+        "street": "99 Elm Ave",
+        "city":   "Shelbyville"
+      },
+      "badges":       [],
+      "departmentId": "dept-hr",
+      "projectIds":   ["proj-gamma"]
+    },
+
+    {
+      "_comment": "Has-many vertical with a single badge. Verifies minItems defaults to 0 (zero-or-more is valid).",
+      "_type":        "Employee",
+      "employeeId":   "emp-004",
+      "name":         "Dave",
+      "departmentId": "dept-eng",
+      "badges": [
+        { "_type": "Badge", "badgeId": "bdg-010", "label": "Pioneer", "level": 5 }
+      ]
+    }
+
+  ],
+
+  "invalid": [
+
+    {
+      "_comment": "ERROR (has-one horizontal): departmentId is required but absent. The owning side of a horizontal relationship must always carry the reference.",
+      "_type":      "Employee",
+      "employeeId": "emp-bad-001",
+      "name":       "Missing Department"
+    },
+
+    {
+      "_comment": "ERROR (has-one vertical): address is present but the embedded Address is missing its required 'street' field.",
+      "_type":        "Employee",
+      "employeeId":   "emp-bad-002",
+      "name":         "Bad Address",
+      "departmentId": "dept-eng",
+      "address": {
+        "_type": "Address",
+        "city":  "Nowhere"
+      }
+    },
+
+    {
+      "_comment": "ERROR (has-many vertical): one Badge in the array is missing its required 'label' field.",
+      "_type":        "Employee",
+      "employeeId":   "emp-bad-003",
+      "name":         "Bad Badge",
+      "departmentId": "dept-eng",
+      "badges": [
+        { "_type": "Badge", "badgeId": "bdg-ok",  "label": "OK" },
+        { "_type": "Badge", "badgeId": "bdg-bad" }
+      ]
+    },
+
+    {
+      "_comment": "ERROR (has-one horizontal): departmentId must be a string, not an integer.",
+      "_type":        "Employee",
+      "employeeId":   "emp-bad-004",
+      "name":         "Bad Dept Type",
+      "departmentId": 42
+    },
+
+    {
+      "_comment": "ERROR (has-many horizontal): each element of projectIds must be a string. An integer ID is not valid.",
+      "_type":        "Employee",
+      "employeeId":   "emp-bad-005",
+      "name":         "Bad Project IDs",
+      "departmentId": "dept-eng",
+      "projectIds":   ["proj-ok", 99]
+    },
+
+    {
+      "_comment": "ERROR (has-many vertical): badges must be an array, not an object.",
+      "_type":        "Employee",
+      "employeeId":   "emp-bad-006",
+      "name":         "Badges Not Array",
+      "departmentId": "dept-eng",
+      "badges":       { "_type": "Badge", "badgeId": "bdg-001", "label": "Solo" }
+    }
+
+  ]
+}
