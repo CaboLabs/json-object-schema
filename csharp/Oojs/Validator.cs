@@ -354,29 +354,11 @@ public sealed class Validator
             return !_failFast;
         }
 
-        var refType = _registry.ResolveTypeIn(prop.TypeName, schema.SchemaId);
-        if (refType is null)
-        {
-            if (prop.TypeName.Contains('.'))
-            {
-                var parts = prop.TypeName.Split('.', 2);
-                var alias = parts[0];
-                var name = parts[1];
-                if (schema.Imports.TryGetValue(alias, out var importedId))
-                {
-                    var importedSchema = _registry.GetSchema(importedId);
-                    if (importedSchema is not null)
-                    {
-                        importedSchema.Types.TryGetValue(name, out refType);
-                    }
-                }
-            }
-        }
-
+        var refType = prop.ResolvedType;
         if (refType is null)
         {
             errors.Add(new ValidationError(path, ErrorCode.UNKNOWN_TYPE,
-                $"cannot resolve type '{prop.TypeName}'"));
+                $"type reference '{prop.TypeName}' was not resolved at load time"));
             return !_failFast;
         }
 

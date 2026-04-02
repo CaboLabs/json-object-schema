@@ -263,4 +263,60 @@ public sealed class SchemaLoadingTests
             },
         }));
     }
+
+    [Fact]
+    public void PropertyTypeRefToUnknownTypeFailsAtLoadTime()
+    {
+        var r = new Registry();
+        Assert.Throws<SchemaError>(() => r.LoadDict(new Dictionary<string, object?>
+        {
+            ["$oojs"] = "1.0",
+            ["$id"] = "https://example.org/schemas/test-unknown",
+            ["types"] = new Dictionary<string, object?>
+            {
+                ["Owner"] = new Dictionary<string, object?>
+                {
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["pet"] = new Dictionary<string, object?> { ["type"] = "GhostType" },
+                    },
+                },
+            },
+        }));
+    }
+
+    [Fact]
+    public void PropertyTypeRefToUnknownTypeInImportFailsAtLoadTime()
+    {
+        var r = new Registry();
+        r.LoadDict(new Dictionary<string, object?>
+        {
+            ["$oojs"] = "1.0",
+            ["$id"] = "https://example.org/schemas/lib",
+            ["types"] = new Dictionary<string, object?>
+            {
+                ["RealType"] = new Dictionary<string, object?>
+                {
+                    ["properties"] = new Dictionary<string, object?> { ["x"] = new Dictionary<string, object?> { ["type"] = "integer" } },
+                },
+            },
+        });
+
+        Assert.Throws<SchemaError>(() => r.LoadDict(new Dictionary<string, object?>
+        {
+            ["$oojs"] = "1.0",
+            ["$id"] = "https://example.org/schemas/consumer",
+            ["$imports"] = new Dictionary<string, object?> { ["lib"] = "https://example.org/schemas/lib" },
+            ["types"] = new Dictionary<string, object?>
+            {
+                ["Consumer"] = new Dictionary<string, object?>
+                {
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["item"] = new Dictionary<string, object?> { ["type"] = "lib.GhostType" },
+                    },
+                },
+            },
+        }));
+    }
 }

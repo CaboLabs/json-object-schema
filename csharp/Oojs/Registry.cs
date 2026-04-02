@@ -177,6 +177,7 @@ public sealed class Registry
         }
 
         ResolveHierarchy(schema, source);
+        ResolvePropertyTypeRefs(schema, source);
 
         foreach (var kvp in schema.Types)
         {
@@ -609,6 +610,29 @@ public sealed class Registry
             );
         }
         return localType;
+    }
+
+    private void ResolvePropertyTypeRefs(Schema schema, string source)
+    {
+        foreach (var (typeName, typedef) in schema.Types)
+        {
+            foreach (var (propName, prop) in typedef.OwnProperties)
+            {
+                ResolvePropertyTypeRef(prop, schema, source, $"type '{typeName}', property '{propName}'");
+            }
+        }
+    }
+
+    private void ResolvePropertyTypeRef(PropertyDef prop, Schema schema, string source, string context)
+    {
+        if (prop is TypeRefProperty trp)
+        {
+            trp.ResolvedType = ResolveTypeRef(trp.TypeName, schema, source, context);
+        }
+        else if (prop is ArrayProperty ap)
+        {
+            ResolvePropertyTypeRef(ap.Items, schema, source, context + ".items");
+        }
     }
 
     public Schema? GetSchema(string schemaId) => _schemas.TryGetValue(schemaId, out var s) ? s : null;

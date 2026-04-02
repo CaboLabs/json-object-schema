@@ -84,7 +84,7 @@ public sealed class ValidatorTests
     public void TypeRefUnknownTypeReportsUnknownType()
     {
         var r = new Registry();
-        r.LoadDict(new Dictionary<string, object?>
+        Assert.Throws<SchemaError>(() => r.LoadDict(new Dictionary<string, object?>
         {
             ["$oojs"] = "1.0",
             ["$id"] = "https://example.org/schemas/ref-unknown",
@@ -99,17 +99,7 @@ public sealed class ValidatorTests
                     ["required"] = new List<object?> { "child" },
                 },
             },
-        });
-        var schema = r.GetSchema("https://example.org/schemas/ref-unknown")!;
-
-        var errs = ValidatorUtil.Validate(
-            new Dictionary<string, object?> { ["_type"] = "Parent", ["child"] = new Dictionary<string, object?>() },
-            schema.Types["Parent"],
-            schema,
-            r
-        );
-
-        Assert.True(TestHelpers.HasCode(errs, ErrorCode.UNKNOWN_TYPE));
+        }));
     }
 
     [Fact]
