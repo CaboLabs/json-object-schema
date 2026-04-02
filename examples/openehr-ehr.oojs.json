@@ -129,6 +129,26 @@
       }
     },
 
+    "WORKFLOW_DESCRIPTION": {
+      "extends": "cm.LOCATABLE",
+      "description": "Embedded description of a workflow execution associated with an ENTRY. Carries the workflow identifier and archetyped details. The same workflow engine object may also be referenced horizontally by other source types outside the composition hierarchy.",
+      "properties": {
+        "workflow_id": { "type": "string", "description": "Identifier of the workflow execution in the workflow engine." },
+        "details":     { "type": "ds.ITEM_STRUCTURE", "description": "Optional archetyped workflow details." }
+      },
+      "required": ["workflow_id"]
+    },
+
+    "GUIDELINE": {
+      "extends": "cm.LOCATABLE",
+      "description": "Embedded representation of a clinical guideline or protocol that generated a CARE_ENTRY. Carries the guideline identifier and archetyped content. The same guideline may also be referenced horizontally by other source types outside the composition hierarchy.",
+      "properties": {
+        "guideline_id": { "type": "string", "description": "Identifier of the guideline in an external knowledge repository." },
+        "details":      { "type": "ds.ITEM_STRUCTURE", "description": "Optional archetyped guideline content or summary." }
+      },
+      "required": ["guideline_id"]
+    },
+
     "ENTRY": {
       "extends": "CONTENT_ITEM",
       "abstract": true,
@@ -138,7 +158,7 @@
         "encoding":  { "type": "dt.CODE_PHRASE", "description": "Character encoding of text values in this Entry, coded from openEHR Code Set 'character sets'." },
         "subject":   { "type": "cm.PARTY_PROXY", "description": "Subject of this Entry. Use PARTY_SELF when the Entry is about the record subject." },
         "provider":  { "type": "cm.PARTY_PROXY", "description": "Optional provider of the information in this Entry." },
-        "workflow_id":{ "type": "bt.OBJECT_REF", "description": "Optional reference to externally held workflow engine data for this workflow execution." },
+        "workflow_id":{ "type": "WORKFLOW_DESCRIPTION", "description": "Optional embedded description of the workflow execution associated with this Entry." },
         "other_participations": {
           "type": "array", "items": { "type": "cm.PARTICIPATION" }, "minItems": 1,
           "description": "Optional other participations at Entry level."
@@ -159,10 +179,10 @@
     "CARE_ENTRY": {
       "extends": "ENTRY",
       "abstract": true,
-      "description": "Abstract parent of all clinical ENTRY subtypes. Adds protocol (how the information was obtained) and optional guideline_id to the base ENTRY attributes.",
+      "description": "Abstract parent of all clinical ENTRY subtypes. Adds protocol (how the information was obtained) and optional guideline to the base ENTRY attributes.",
       "properties": {
-        "protocol":     { "type": "ds.ITEM_STRUCTURE", "description": "Optional description of the method used to arrive at this Entry, e.g. clinical protocol, instrument, guideline reference." },
-        "guideline_id": { "type": "bt.OBJECT_REF",     "description": "Optional reference to an external guideline that generated this Entry." }
+        "protocol":    { "type": "ds.ITEM_STRUCTURE", "description": "Optional description of the method used to arrive at this Entry, e.g. clinical protocol, instrument, guideline reference." },
+        "guideline_id":{ "type": "GUIDELINE",         "description": "Optional embedded guideline that generated this Entry." }
       }
     },
 
@@ -228,11 +248,11 @@
 
     "INSTRUCTION_DETAILS": {
       "extends": "cm.PATHABLE",
-      "description": "Details of the INSTRUCTION that caused an ACTION to be performed. Records a reference to the Instruction, the Activity path within it, and optional workflow engine state.",
+      "description": "Details of the INSTRUCTION that caused an ACTION to be performed. Embeds the causing Instruction directly, records the Activity path within it, and carries optional workflow engine state.",
       "properties": {
-        "instruction_id": { "type": "bt.LOCATABLE_REF",  "description": "Reference to the causing INSTRUCTION." },
-        "activity_id":    { "type": "string",             "description": "Archetype path identifying the Activity within the Instruction." },
-        "wf_details":     { "type": "ds.ITEM_STRUCTURE",  "description": "Optional workflow engine state details, e.g. fired conditions, notifications." }
+        "instruction_id": { "type": "INSTRUCTION",     "description": "The causing INSTRUCTION, embedded. The same INSTRUCTION instance may also be referenced horizontally from other source types outside this composition." },
+        "activity_id":    { "type": "string",          "description": "Archetype path identifying the Activity within the Instruction." },
+        "wf_details":     { "type": "ds.ITEM_STRUCTURE","description": "Optional workflow engine state details, e.g. fired conditions, notifications." }
       },
       "required": ["instruction_id", "activity_id"]
     },
