@@ -116,3 +116,11 @@ examples/
 - [OpenAPI 3.x discriminator](https://spec.openapis.org/oas/v3.1.0#discriminator-object) — partial predecessor to OOJS polymorphism
 - [Apache Avro](https://avro.apache.org/) — named records + unions, binary-encoding focused
 - [XML Schema (XSD)](https://www.w3.org/XML/Schema) — `complexType`/`extension` equivalent semantics
+
+## Spec Link Check
+
+Run this to ensure all `§...` references in the spec are clickable and internal section anchors resolve:
+
+```bash
+python3 scripts/check_spec_section_links.py
+```
