@@ -152,6 +152,9 @@ class Registry:
         # Resolve extends (pass 2: build the hierarchy)
         self._resolve_hierarchy(schema, source)
 
+        # Resolve property TypeRefs (pass 3: eager resolution)
+        self._resolve_property_type_refs(schema, source)
+
         # Check required entries reference own properties only
         for type_name, typedef in schema.types.items():
             for req in typedef.own_required:
@@ -460,6 +463,26 @@ class Registry:
                     )
                 visited.add(key)
                 current = current.supertype
+
+    def _resolve_property_type_refs(self, schema: Schema, source: str) -> None:
+        for type_name, typedef in schema.types.items():
+            for prop_name, prop in typedef.own_properties.items():
+                self._resolve_property_type_ref(
+                    prop, schema, source,
+                    context=f"type '{type_name}', property '{prop_name}'"
+                )
+
+    def _resolve_property_type_ref(
+        self, prop: PropertyDef, schema: Schema, source: str, context: str
+    ) -> None:
+        if isinstance(prop, TypeRefProperty):
+            prop.resolved_type = self._resolve_type_ref(
+                prop.type_name, schema, source, context=context
+            )
+        elif isinstance(prop, ArrayProperty):
+            self._resolve_property_type_ref(
+                prop.items, schema, source, context=context + ".items"
+            )
 
     def _resolve_type_ref(
         self,

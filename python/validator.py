@@ -425,24 +425,13 @@ class Validator:
             ))
             return not self._fail_fast
 
-        # Resolve the type
-        ref_typedef = self._registry.resolve_type_in(prop.type_name, schema.schema_id)
+        ref_typedef = prop.resolved_type
         if ref_typedef is None:
-            # Try qualified ref resolution via the schema's imports
-            s = self._registry.get_schema(schema.schema_id)
-            if s is not None and "." in prop.type_name:
-                alias, name = prop.type_name.split(".", 1)
-                imported_id = s.imports.get(alias)
-                if imported_id:
-                    imported_schema = self._registry.get_schema(imported_id)
-                    if imported_schema:
-                        ref_typedef = imported_schema.types.get(name)
-            if ref_typedef is None:
-                errors.append(ValidationError(
-                    path=path, code=ErrorCode.UNKNOWN_TYPE,
-                    message=f"cannot resolve type '{prop.type_name}'",
-                ))
-                return not self._fail_fast
+            errors.append(ValidationError(
+                path=path, code=ErrorCode.UNKNOWN_TYPE,
+                message=f"type reference '{prop.type_name}' was not resolved at load time",
+            ))
+            return not self._fail_fast
 
         # Determine which schema governs the referenced type
         ref_schema = self._registry.get_schema(ref_typedef.schema_id) or schema

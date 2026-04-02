@@ -140,22 +140,19 @@ def test_validator_type_ref_mismatch():
 
 def test_validator_type_ref_unknown_type():
     r = Registry()
-    r.load_dict({
-        "$oojs": "1.0",
-        "$id": "https://example.org/schemas/ref-unknown",
-        "types": {
-            "Parent": {
-                "properties": {
-                    "child": {"type": "MissingType"},
+    with pytest.raises(SchemaError, match="not found"):
+        r.load_dict({
+            "$oojs": "1.0",
+            "$id": "https://example.org/schemas/ref-unknown",
+            "types": {
+                "Parent": {
+                    "properties": {
+                        "child": {"type": "MissingType"},
+                    },
+                    "required": ["child"],
                 },
-                "required": ["child"],
             },
-        },
-    })
-    schema = r.get_schema("https://example.org/schemas/ref-unknown")
-
-    errs = validate({"_type": "Parent", "child": {"x": 1}}, schema.types["Parent"], schema, r)
-    assert any(e.code == ErrorCode.UNKNOWN_TYPE for e in errs)
+        })
 
 
 def test_validator_type_ref_via_imports():
@@ -1002,3 +999,45 @@ def test_car_relationships_sample_valid():
     loaded = r.load_dict(schema)
     errs = validate(instance, loaded.types["Fleet"], loaded, r)
     assert errs == []
+
+
+def test_property_typeref_to_unknown_type_fails_at_load_time():
+    r = Registry()
+    with pytest.raises(SchemaError, match="not found"):
+        r.load_dict({
+            "$oojs": "1.0",
+            "$id": "https://example.org/schemas/test-unknown",
+            "types": {
+                "Owner": {
+                    "properties": {
+                        "pet": {"type": "GhostType"},
+                    },
+                },
+            },
+        })
+
+
+def test_property_typeref_to_unknown_type_in_import_fails_at_load_time():
+    r = Registry()
+    r.load_dict({
+        "$oojs": "1.0",
+        "$id": "https://example.org/schemas/lib",
+        "types": {
+            "RealType": {
+                "properties": {"x": {"type": "integer"}},
+            },
+        },
+    })
+    with pytest.raises(SchemaError, match="not found"):
+        r.load_dict({
+            "$oojs": "1.0",
+            "$id": "https://example.org/schemas/consumer",
+            "imports": {"lib": "https://example.org/schemas/lib"},
+            "types": {
+                "Consumer": {
+                    "properties": {
+                        "item": {"type": "lib.GhostType"},
+                    },
+                },
+            },
+        })

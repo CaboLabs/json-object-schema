@@ -37,6 +37,7 @@ class TypeRefProperty:
     type_name: str          # "TypeName" or "alias.TypeName"
     title: str = ""
     description: str = ""
+    resolved_type: "TypeDef | None" = field(default=None, repr=False)  # populated at load time
 
 
 @dataclass
