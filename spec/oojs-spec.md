@@ -536,11 +536,13 @@ The `minItems` and `maxItems` constraints on an array property ([§6.3](#sec-6-3
 <a id="sec-8-8"></a>
 ### 8.8 Vertical Relationships (Hierarchical / Embedded)
 
-A **vertical relationship** (also called *hierarchical* or *composition*) embeds the associated object directly inside the owning object's JSON representation. The owned object:
+A **vertical relationship** (also called *hierarchical* or *composition*) embeds the associated object directly inside the owning object's JSON representation. In this relationship, the embedded instance:
 
 - carries its own discriminator property and is fully validated by the OOJS validator as part of its owner's validation;
 - exists only within the scope of its owner's JSON document;
-- has no independent identity outside that document.
+- has no independent identity within that document (though it MAY carry an application-level identifier as a plain property).
+
+> **Note — this is a property of the relationship, not the type.** The target type definition is not restricted to vertical use. The same type MAY also appear as the target of a horizontal relationship declared by a different source type ([§8.9](#sec-8-9)). The choice between vertical and horizontal belongs to each individual property declaration, not to the target type itself.
 
 **Has-one vertical** — expressed as a TypeRefProperty ([§6.2](#sec-6-2)):
 
@@ -608,15 +610,17 @@ Each item in the array is validated independently by the discriminator dispatch 
 - The validator enforces the full structure of every embedded object automatically.
 - The entire object graph is self-contained in one JSON document.
 - Embedded objects do not need a globally unique identifier (though they MAY have one).
-- Appropriate for **ownership/composition**: the embedded object's lifecycle is tied to its owner.
-- Not appropriate when the same object must be referenced from multiple owners.
+- Appropriate for **ownership/composition**: when the embedded object's lifecycle is tied to its owner in this specific relationship.
+- Not appropriate for a property whose value must be independently shareable across multiple owners — use a horizontal relationship for that property instead.
 
 ---
 
 <a id="sec-8-9"></a>
 ### 8.9 Horizontal Relationships (Non-Hierarchical / Reference by ID)
 
-A **horizontal relationship** (also called *non-hierarchical* or *association by reference*) stores only an opaque identifier that points to an associated object. The associated object is NOT embedded in the JSON; it resides in a separate location (another document, a database row, an API response).
+A **horizontal relationship** (also called *non-hierarchical* or *association by reference*) stores only an opaque identifier that points to an associated object. In this relationship, the associated object is NOT embedded in the JSON; it resides in a separate location (another document, a database row, an API response).
+
+> **Note — this is a property of the relationship, not the type.** The target type definition is not restricted to horizontal use. The same type MAY also appear as the target of a vertical (embedded) relationship declared by a different source type ([§8.8](#sec-8-8)). The choice between horizontal and vertical belongs to each individual property declaration, not to the target type itself.
 
 **Has-one horizontal** — expressed as a string property:
 
@@ -673,10 +677,12 @@ A valid `Fleet` instance holds only IDs; the `Car` and `Person` objects are fetc
 **Characteristics of horizontal relationships:**
 
 - OOJS validates only the structural type of the ID property (it is a string); referential integrity — whether the referenced object actually exists — is outside the scope of this specification and MUST be enforced by the application layer.
-- The associated object has an independent lifecycle; it can be updated, transferred, or deleted without affecting the owner's JSON document.
-- The same object can be referenced by multiple owners simultaneously (many-to-many patterns).
+- In this relationship, the associated object is treated as having an independent lifecycle; it can be updated, transferred, or deleted without affecting the owner's JSON document.
+- The same object instance can be referenced by multiple owners simultaneously (many-to-many patterns).
 - The JSON document remains small even when many objects are associated.
-- Appropriate for **associations**: when the referenced object exists independently and may be shared.
+- Appropriate for **associations**: when, in the context of this specific relationship, the referenced object exists independently and may be shared.
+
+> **Important — validation coverage**: Because a horizontal relationship stores only a string ID, the OOJS validator never inspects or validates the structure of the referenced object — it only confirms the ID property is a string. If the same target type is also used in a vertical relationship elsewhere in the schema, those embedded instances ARE fully validated. The same type therefore has different validation coverage depending on which relationship style each source type chooses. This is by design; schema authors should account for it.
 
 > **Note — same-document references**: The referenced objects in a horizontal relationship do not have to reside in a separate document or data store. When it is useful to serialize a complete object graph in one JSON file, the **Graph Document format** ([§8.12](#sec-8-12)) allows referenced objects to be co-located in the same document and linked via `{ "$ref-id": "<id>" }` expressions instead of bare ID strings. This preserves object independence (no embedding) while enabling atomic transport and validation of the whole graph.
 
@@ -685,18 +691,27 @@ A valid `Fleet` instance holds only IDs; the `Car` and `Person` objects are fetc
 <a id="sec-8-10"></a>
 ### 8.10 Choosing Between Vertical and Horizontal
 
-The following guidelines assist schema authors in selecting the appropriate relationship style. They are advisory, not normative.
+The following guidelines assist schema authors in selecting the appropriate relationship style **for each individual property declaration**. They are advisory, not normative.
 
-| Question | Vertical (embed) | Horizontal (ID ref) |
+These questions are evaluated **per relationship** (i.e., per property on the source type), not as a global classification of the target type. The same target type may give different answers depending on which source type is declaring the relationship and for what purpose.
+
+| Question (evaluate for this specific relationship) | Vertical (embed) | Horizontal (ID ref) |
 |----------|-----------------|---------------------|
-| Does the associated object have an independent identity? | No → embed | Yes → reference |
-| Can the same object be owned by multiple parents at once? | No → embed | Yes → reference |
+| In this relationship, does the associated instance have an independent identity? | No → embed | Yes → reference |
+| Can the same instance be referenced by multiple owners simultaneously? | No → embed | Yes → reference |
 | Must the entire graph be validated in one pass? | Yes → embed | No → reference |
 | Is the document size a concern with large collections? | No → embed | Yes → reference |
 | Is referential integrity enforced by the schema? | Yes (automatically) | No (application responsibility) |
-| Does the associated object outlive its owner? | No → embed | Yes → reference |
+| Does the associated object outlive its owner in this relationship? | No → embed | Yes → reference |
 
-A single schema may freely mix vertical and horizontal relationships. For example, a `Car` might embed its `Motor` vertically (the motor has no existence outside the car) while referencing its `Owner` horizontally (the owner exists independently and may own multiple cars).
+**Mixing styles freely — including for the same target type.** A single schema may freely mix vertical and horizontal relationships, and the same target type MAY be used in both styles by different source types. For example, a schema might declare:
+
+- `Car` embeds `Motor` vertically — the motor has no existence outside this car instance.
+- `ServiceRecord` references `Motor` horizontally by ID — the motor is an independently-existing entity that the service record points to.
+
+Both relationships are valid in the same schema. `Motor` is not locked into one style. Each source type (`Car`, `ServiceRecord`) independently decides how it relates to `Motor` based on the semantics of that particular relationship.
+
+**What MUST NOT be done**: a source type MUST NOT mix vertical and horizontal in the same property. A property is either a TypeRefProperty (vertical) or a string property (horizontal) — not both. The choice is made once, per property, at schema definition time.
 
 ---
 
