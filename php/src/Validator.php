@@ -575,7 +575,7 @@ class Validator
                 return !$this->failFast;
             }
             $targetTypedef = $this->registry->lookupByDiscriminatorValue($targetTypeName);
-            $refTypedef    = $this->registry->resolveTypeIn($prop->typeName, $schema->schemaId);
+            $refTypedef    = $prop->resolvedType;
             if ($targetTypedef === null || $refTypedef === null) {
                 $errors[] = new ValidationError($path, ErrorCode::UNKNOWN_TYPE, "cannot resolve type '{$prop->typeName}'");
                 return !$this->failFast;
@@ -600,33 +600,18 @@ class Validator
             return !$this->failFast;
         }
 
-        // Resolve the type (handles both qualified and unqualified names)
-        $refTypedef = $this->registry->resolveTypeIn($prop->typeName, $schema->schemaId);
-
-        if ($refTypedef === null) {
-            // Fallback: try qualified resolution through the schema's imports
-            if (str_contains($prop->typeName, '.')) {
-                [$alias, $name] = explode('.', $prop->typeName, 2);
-                $importedId = $schema->imports[$alias] ?? null;
-                if ($importedId !== null) {
-                    $importedSchema = $this->registry->getSchema($importedId);
-                    if ($importedSchema !== null) {
-                        $refTypedef = $importedSchema->types[$name] ?? null;
-                    }
-                }
-            }
-        }
-
+        // resolvedType is guaranteed non-null by eager registry resolution (§A.3).
+        // A null here indicates a schema that bypassed the registry load path.
+        $refTypedef = $prop->resolvedType;
         if ($refTypedef === null) {
             $errors[] = new ValidationError(
                 $path,
                 ErrorCode::UNKNOWN_TYPE,
-                "cannot resolve type '{$prop->typeName}'",
+                "type reference '{$prop->typeName}' was not resolved at load time",
             );
             return !$this->failFast;
         }
 
-        // Determine which schema governs the referenced type
         $refSchema = $this->registry->getSchema($refTypedef->schemaId) ?? $schema;
         return $this->validateInstance($value, $refTypedef, $refSchema, $path, $errors);
     }

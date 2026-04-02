@@ -1232,12 +1232,14 @@ When loading a schema:
 
 1. Parse the JSON document. If parsing fails, report a load error.
 2. Validate the schema document structure against this specification (§4, §5, §6).
-3. Check `$id` uniqueness in the registry. If already loaded, skip (idempotent) or error (strict mode).
+3. Check `$id` uniqueness in the registry. If already loaded, skip (idempotent) or error (strict mode). See **Note** below.
 4. Resolve `imports`: for each alias → URI, load the target schema (recursively) and register the alias mapping.
 5. Resolve all `extends` references and type references within `properties`. Report unresolved references as load errors.
 6. Build the type hierarchy. Detect and report cycles.
 7. Check discriminator value uniqueness across all loaded schemas.
 8. Index types by discriminator value (O(1) lookup).
+
+> **Note — $id collision behaviour**: Step 3 allows two strategies. Idempotent mode (skip if already loaded) is the RECOMMENDED default because it allows schemas to be loaded in any order without tracking dependencies. Strict mode (error on duplicate) is valid but places the ordering burden on the caller. What MUST NOT happen in either mode is silently replacing an already-registered schema with a different schema that shares its `$id` — this would invalidate previously resolved type references and produce undefined validator behaviour. Implementations SHOULD document which mode they implement.
 
 ### 10.3 Circular Imports
 
@@ -1474,3 +1476,70 @@ An adversarially crafted schema with very deep inheritance chains or very large 
 - **[OPENAPI]** OpenAPI Initiative, "OpenAPI Specification 3.1.0", February 2021. <https://spec.openapis.org/oas/v3.1.0>
 - **[XSD]** W3C, "XML Schema Part 1: Structures Second Edition", October 2004. <https://www.w3.org/TR/xmlschema-1/>
 - **[AVRO]** Apache Software Foundation, "Apache Avro Specification", 2023. <https://avro.apache.org/docs/current/specification/>
+
+---
+
+## Appendix A — Implementation Guide (Informative)
+
+This appendix collects practical guidance for implementors. Nothing here overrides the normative requirements in §1–§15; it explains the intent behind design choices and flags common pitfalls.
+
+### A.1 `$id` Is an Identifier, Not a Locator
+
+The `$id` URI (§4.3) uniquely names a schema within a registry. It is an opaque identifier — no conforming processor is required to resolve it over a network or map it to a filesystem path. An implementation that attempts to HTTP-GET a `$id` URI and receives a 404 is not witnessing a spec violation; it is observing that the URI was never intended to be dereferenceable.
+
+**Consequence**: there is no automatic schema discovery in OOJS. An implementation cannot read a single root schema and silently pull in its imports from the network. All schemas that are transitively imported MUST be explicitly loaded into the registry by the caller before validation begins (see §A.2).
+
+Implementations MAY offer a URI-to-path mapping table as a convenience feature:
+
+```
+registry.addMapping(
+  "https://specifications.openehr.org/schemas/oojs/base/base_types",
+  "/schemas/openehr-base-types.oojs.json"
+);
+registry.loadFile("/schemas/openehr-ehr.oojs.json"); // imports resolved via mapping
+```
+
+This is purely a quality-of-life feature; the spec does not require it.
+
+### A.2 Registry Bootstrapping Is the Caller's Responsibility
+
+Because §A.1 defines no automatic resolution, the caller is responsible for populating the registry with every schema that may be referenced — directly or transitively — before calling `validate()`. A practical loading sequence for a multi-schema setup:
+
+1. Load all leaf schemas (those with no imports, or whose imports are already loaded).
+2. Load schemas that import the above.
+3. Continue up the dependency tree until the root schema is loaded.
+
+Because idempotent loading is RECOMMENDED (§10.2 Note), the order in steps 1–3 does not matter in practice: loading a schema whose `$id` is already registered is a no-op. Callers can therefore load all known schemas unconditionally at startup.
+
+If a schema references an import whose `$id` is not yet in the registry when `resolveHierarchy` runs, the loader MUST report a load error (§10.2 step 5) rather than deferring the failure to validation time.
+
+### A.3 Eager vs Lazy Type Reference Resolution
+
+§10.2 step 5 requires resolving "all `extends` references and type references within `properties`" at load time. This applies equally to:
+
+- `extends` strings in type definitions (supertype links), and
+- `type` strings in property definitions that name another type (`TypeRefProperty`).
+
+**Eager resolution** (resolving property type strings to `TypeDef` objects during `loadSchema()`) is strongly RECOMMENDED because:
+
+- Broken references (typos, missing imports) are detected immediately when the schema is loaded, not silently until a particular code path is exercised during validation.
+- The validator can use the pre-resolved `TypeDef` pointer directly, making validation simpler and faster.
+
+**Lazy resolution** (resolving property type strings at validation time) is not prohibited by the normative text, but it defers error detection in a way that makes broken schemas hard to diagnose in production. Implementations that choose lazy resolution SHOULD clearly document this behaviour.
+
+The reference implementation follows eager resolution: after building the type hierarchy, a second pass iterates every property in every type and resolves `TypeRefProperty` strings to `TypeDef` pointers. A load error is reported if any reference cannot be resolved.
+
+### A.4 The Silent $id Replacement Hazard
+
+An implementation that allows a second schema with the same `$id` to overwrite the first one in the registry creates a subtle correctness hazard: any `TypeDef` objects that were resolved against the first schema (via `extends` or `TypeRefProperty` resolution) now point to types in a schema that is no longer registered, while newly resolved references point to the replacement. The registry is in an internally inconsistent state.
+
+To avoid this, implementations MUST choose one of:
+
+- **Idempotent (RECOMMENDED)**: return the already-registered schema unchanged; ignore the new document entirely.
+- **Strict**: report a load error if a schema with the same `$id` is loaded again.
+
+Neither strategy allows silent replacement.
+
+### A.5 Cross-Schema Discriminator Values
+
+When a schema imports another schema under an alias, the default discriminator value for an imported type is `"<alias>.<TypeName>"` (§7.3). This default is relative to the importing schema's alias, not to any canonical name in the source schema. The same type loaded under different aliases in different importing schemas will have different default discriminator values. Schema authors who need stable discriminator values across multiple importers SHOULD set `discriminatorValue` explicitly on the relevant types.

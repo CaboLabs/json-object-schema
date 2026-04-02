@@ -152,6 +152,10 @@ class CoverageCompletionTest extends TestCase
 
     public function test_validator_type_ref_unknown_type(): void
     {
+        // Unresolvable TypeRef property references are now caught at load time
+        // via eager resolution (§A.3), not deferred to validation time.
+        $this->expectException(\Oojs\SchemaError::class);
+        $this->expectExceptionMessageMatches('/not found/');
         $r = new Registry();
         $r->loadDict([
             '$oojs' => '1.0',
@@ -165,10 +169,6 @@ class CoverageCompletionTest extends TestCase
                 ],
             ],
         ]);
-        $schema = $r->getSchema('https://example.org/schemas/ref-unknown');
-
-        $errs = validate(['_type' => 'Parent', 'child' => ['x' => 1]], $schema->types['Parent'], $schema, $r);
-        $this->assertTrue($this->hasCode($errs, ErrorCode::UNKNOWN_TYPE));
     }
 
     public function test_validator_type_ref_via_imports(): void
@@ -1020,8 +1020,11 @@ class CoverageCompletionTest extends TestCase
         $this->assertSame([], $errs);
     }
 
-    public function test_validator_type_ref_fallback_import_resolution(): void
+    public function test_validator_type_ref_cross_schema_resolution(): void
     {
+        // Cross-schema TypeRef properties are resolved eagerly at load time (§A.3).
+        // This test verifies that a valid instance passes when the imported type is
+        // properly loaded and resolved through the registry.
         $r = new Registry();
         $r->loadDict([
             '$oojs' => '1.0',
@@ -1029,30 +1032,30 @@ class CoverageCompletionTest extends TestCase
             'types' => [
                 'Pet' => [
                     'properties' => ['name' => ['type' => 'string']],
-                    'required' => ['name'],
+                    'required'   => ['name'],
+                ],
+            ],
+        ]);
+        $r->loadDict([
+            '$oojs'   => '1.0',
+            '$id'     => 'https://example.org/schemas/owner',
+            'imports' => ['other' => 'https://example.org/schemas/other'],
+            'types'   => [
+                'Owner' => [
+                    'properties' => ['pet' => ['type' => 'other.Pet']],
+                    'required'   => ['pet'],
                 ],
             ],
         ]);
 
-        $schema = new Schema('1.0', 'https://example.org/schemas/manual');
-        $schema->imports = ['other' => 'https://example.org/schemas/other'];
-
-        $prop = new TypeRefProperty('other.Pet');
-        $validator = new Validator($r);
-        $method = new \ReflectionMethod(Validator::class, 'validateTypeRef');
-        $method->setAccessible(true);
-        $errors = [];
-
-        $ok = $method->invokeArgs($validator, [
-            ['_type' => 'Pet', 'name' => 'Fido'],
-            $prop,
+        $schema = $r->getSchema('https://example.org/schemas/owner');
+        $errs = validate(
+            ['_type' => 'Owner', 'pet' => ['_type' => 'Pet', 'name' => 'Fido']],
+            $schema->types['Owner'],
             $schema,
-            '/pet',
-            &$errors,
-        ]);
-
-        $this->assertTrue($ok);
-        $this->assertSame([], $errors);
+            $r,
+        );
+        $this->assertSame([], $errs);
     }
 
     public function test_validator_json_kind_matches_null_and_boolean(): void

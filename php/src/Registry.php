@@ -179,6 +179,10 @@ class Registry
         // Resolve extends (pass 2: build the hierarchy)
         $this->resolveHierarchy($schema, $source);
 
+        // Resolve TypeRef property type names to TypeDef objects (pass 3: eager resolution)
+        // This ensures broken references are caught at load time, not at validation time (§A.3).
+        $this->resolvePropertyTypeRefs($schema, $source);
+
         // Check required entries reference own properties only
         foreach ($schema->types as $typeName => $typedef) {
             foreach ($typedef->ownRequired as $req) {
@@ -547,6 +551,34 @@ class Registry
                 $current = $current->supertype;
             }
         }
+    }
+
+    /**
+     * Eagerly resolve all TypeRefProperty type-name strings to TypeDef objects (§A.3).
+     * Iterates every own property of every type in the schema; for arrays, recurses
+     * into the items property. Reports a load error for any unresolvable reference.
+     */
+    private function resolvePropertyTypeRefs(Schema $schema, string $source): void
+    {
+        foreach ($schema->types as $typeName => $typedef) {
+            foreach ($typedef->ownProperties as $propName => $prop) {
+                $this->resolvePropertyTypeRef($prop, $schema, $source, "type '$typeName', property '$propName'");
+            }
+        }
+    }
+
+    private function resolvePropertyTypeRef(
+        PropertyDef $prop,
+        Schema $schema,
+        string $source,
+        string $context,
+    ): void {
+        if ($prop instanceof TypeRefProperty) {
+            $prop->resolvedType = $this->resolveTypeRef($prop->typeName, $schema, $source, $context);
+        } elseif ($prop instanceof ArrayProperty) {
+            $this->resolvePropertyTypeRef($prop->items, $schema, $source, $context . '.items');
+        }
+        // PrimitiveProperty has no type references to resolve
     }
 
     private function resolveTypeRef(

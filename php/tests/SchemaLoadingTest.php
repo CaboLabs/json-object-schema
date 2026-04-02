@@ -198,4 +198,51 @@ class SchemaLoadingTest extends TestCase
             ],
         ]);
     }
+
+    public function test_property_typeref_to_unknown_type_fails_at_load_time(): void
+    {
+        // A TypeRef in a property that names a non-existent type must be caught
+        // at load time, not silently deferred to validation time (§A.3).
+        $this->expectException(SchemaError::class);
+        $this->expectExceptionMessageMatches('/not found/');
+        self::makeRegistry([
+            '$oojs' => '1.0',
+            '$id'   => 'x',
+            'types' => [
+                'Foo' => [
+                    'properties' => [
+                        'bar' => ['type' => 'NonExistentType'],
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    public function test_property_typeref_to_unknown_type_in_import_fails_at_load_time(): void
+    {
+        // A qualified TypeRef (alias.TypeName) where the type does not exist
+        // in the imported schema must also be caught at load time (§A.3).
+        $this->expectException(SchemaError::class);
+        $this->expectExceptionMessageMatches('/not found/');
+        $base = [
+            '$oojs' => '1.0',
+            '$id'   => 'https://example.org/base',
+            'types' => [
+                'RealType' => [],
+            ],
+        ];
+        $child = [
+            '$oojs'   => '1.0',
+            '$id'     => 'https://example.org/child',
+            'imports' => ['base' => 'https://example.org/base'],
+            'types'   => [
+                'Foo' => [
+                    'properties' => [
+                        'bar' => ['type' => 'base.GhostType'], // does not exist in base
+                    ],
+                ],
+            ],
+        ];
+        self::makeRegistry($base, $child);
+    }
 }
