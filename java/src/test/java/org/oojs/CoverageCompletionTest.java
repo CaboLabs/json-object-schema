@@ -84,15 +84,16 @@ class CoverageCompletionTest extends TestHelpers {
     }
 
     @Test void validator_type_ref_unknown_type() {
-        Registry r = new Registry();
-        r.loadMap(map("$oojs", "1.0", "$id", "https://example.org/schemas/ref-unknown",
-                "types", map("Parent", map(
-                        "properties", map("child", map("type", "MissingType")),
-                        "required", list("child")))));
-        Schema schema = r.getSchema("https://example.org/schemas/ref-unknown");
-        List<ValidationError> errs = new Validator(r).validate(
-                map("_type", "Parent", "child", map("x", 1)), schema.types.get("Parent"), schema);
-        assertTrue(hasCode(errs, ErrorCode.UNKNOWN_TYPE));
+        // Unresolvable TypeRef property references are now caught at load time
+        // via eager resolution (§A.3), not deferred to validation time.
+        SchemaError e = assertThrows(SchemaError.class, () -> {
+            Registry r = new Registry();
+            r.loadMap(map("$oojs", "1.0", "$id", "https://example.org/schemas/ref-unknown",
+                    "types", map("Parent", map(
+                            "properties", map("child", map("type", "MissingType")),
+                            "required", list("child")))));
+        });
+        assertTrue(e.getMessage().contains("not found"));
     }
 
     @Test void validator_type_ref_via_imports() {

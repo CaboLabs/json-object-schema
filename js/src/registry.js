@@ -199,6 +199,10 @@ export class Registry {
     // Pass 2: resolve extends hierarchy
     this._resolveHierarchy(schema, source);
 
+    // Pass 3: eagerly resolve TypeRef property type names to TypeDef objects.
+    // Broken references are caught at load time, not deferred to validation (§A.3).
+    this._resolvePropertyTypeRefs(schema, source);
+
     // Check required entries reference own properties only
     for (const [typeName, typedef] of Object.entries(schema.types)) {
       for (const req of typedef.ownRequired) {
@@ -457,6 +461,27 @@ export class Registry {
       title: data.title ?? '',
       description: data.description ?? '',
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Property type-reference resolution (pass 3)
+  // ------------------------------------------------------------------
+
+  _resolvePropertyTypeRefs(schema, source) {
+    for (const [typeName, typedef] of Object.entries(schema.types)) {
+      for (const [propName, prop] of Object.entries(typedef.ownProperties)) {
+        this._resolvePropertyTypeRef(prop, schema, source, `type '${typeName}', property '${propName}'`);
+      }
+    }
+  }
+
+  _resolvePropertyTypeRef(prop, schema, source, context) {
+    if (prop instanceof TypeRefProperty) {
+      prop.resolvedType = this._resolveTypeRef(prop.typeName, schema, source, context);
+    } else if (prop instanceof ArrayProperty) {
+      this._resolvePropertyTypeRef(prop.items, schema, source, `${context}.items`);
+    }
+    // PrimitiveProperty has no type references to resolve
   }
 
   // ------------------------------------------------------------------

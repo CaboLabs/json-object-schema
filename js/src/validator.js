@@ -408,7 +408,7 @@ export class Validator {
         return !this._failFast;
       }
       const targetTypedef = this._registry.lookupByDiscriminatorValue(targetTypeName);
-      const refTypedef = this._registry.resolveTypeIn(prop.typeName, schema.schemaId);
+      const refTypedef = prop.resolvedType;
       if (!targetTypedef || !refTypedef) {
         errors.push(new ValidationError(path, ErrorCode.UNKNOWN_TYPE,
           `cannot resolve type '${prop.typeName}'`));
@@ -428,22 +428,12 @@ export class Validator {
       return !this._failFast;
     }
 
-    let refTypedef = this._registry.resolveTypeIn(prop.typeName, schema.schemaId);
-
-    if (!refTypedef && prop.typeName.includes('.')) {
-      const dot = prop.typeName.indexOf('.');
-      const alias = prop.typeName.slice(0, dot);
-      const name = prop.typeName.slice(dot + 1);
-      const importedId = schema.imports[alias];
-      if (importedId) {
-        const importedSchema = this._registry.getSchema(importedId);
-        if (importedSchema) refTypedef = importedSchema.types[name];
-      }
-    }
-
+    // resolvedType is guaranteed non-null by eager registry resolution (§A.3).
+    // A null here indicates a schema that bypassed the registry load path.
+    const refTypedef = prop.resolvedType;
     if (!refTypedef) {
       errors.push(new ValidationError(path, ErrorCode.UNKNOWN_TYPE,
-        `cannot resolve type '${prop.typeName}'`));
+        `type reference '${prop.typeName}' was not resolved at load time`));
       return !this._failFast;
     }
 

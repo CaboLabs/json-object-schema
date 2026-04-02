@@ -62,6 +62,10 @@ export class PrimitiveProperty {
 
 /**
  * A property whose value is an object conforming to another named type.
+ *
+ * `resolvedType` is populated by the Registry during the eager type-reference
+ * resolution pass (§10.2 step 5 / Appendix A.3). It is null only between
+ * initial parsing and resolution; after a successful schema load it is always set.
  */
 export class TypeRefProperty {
   /**
@@ -74,6 +78,8 @@ export class TypeRefProperty {
     this.typeName = typeName;
     this.title = title;
     this.description = description;
+    /** @type {TypeDef|null} Resolved at load time by Registry. Never null after successful schema load. */
+    this.resolvedType = null;
   }
 }
 

@@ -137,4 +137,29 @@ class SchemaLoadingTest extends TestHelpers {
                                 map("type", "array", "items", map("type", "integer")))))))));
         assertTrue(e.getMessage().contains("nested arrays"));
     }
+
+    @Test void property_typeref_to_unknown_type_fails_at_load_time() {
+        // A TypeRef in a property that names a non-existent type must be caught
+        // at load time, not silently deferred to validation time (§A.3).
+        SchemaError e = assertThrows(SchemaError.class, () -> makeRegistry(map(
+                "$oojs", "1.0", "$id", "x",
+                "types", map("Foo", map(
+                        "properties", map("bar", map("type", "NonExistentType")))))));
+        assertTrue(e.getMessage().contains("not found"));
+    }
+
+    @Test void property_typeref_to_unknown_type_in_import_fails_at_load_time() {
+        // A qualified TypeRef (alias.TypeName) where the type does not exist
+        // in the imported schema must also be caught at load time (§A.3).
+        SchemaError e = assertThrows(SchemaError.class, () -> {
+            Registry r = new Registry();
+            r.loadMap(map("$oojs", "1.0", "$id", "https://example.org/base",
+                    "types", map("RealType", map())));
+            r.loadMap(map("$oojs", "1.0", "$id", "https://example.org/child",
+                    "imports", map("base", "https://example.org/base"),
+                    "types", map("Foo", map(
+                            "properties", map("bar", map("type", "base.GhostType"))))));
+        });
+        assertTrue(e.getMessage().contains("not found"));
+    }
 }

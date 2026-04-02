@@ -228,6 +228,35 @@ test('SchemaLoading: nested array forbidden', () => {
   assert(threw, 'expected SchemaError');
 });
 
+test('SchemaLoading: property TypeRef to unknown type fails at load time', () => {
+  // A TypeRef in a property that names a non-existent type must be caught
+  // at load time, not silently deferred to validation time (§A.3).
+  let threw = false;
+  try {
+    makeRegistry({
+      '$oojs': '1.0', '$id': 'x',
+      types: { Foo: { properties: { bar: { type: 'NonExistentType' } } } },
+    });
+  } catch (e) { threw = true; assert(e instanceof SchemaError && /not found/i.test(e.message)); }
+  assert(threw, 'expected SchemaError');
+});
+
+test('SchemaLoading: property TypeRef to unknown type in import fails at load time', () => {
+  // A qualified TypeRef (alias.TypeName) where the type does not exist in the
+  // imported schema must also be caught at load time (§A.3).
+  let threw = false;
+  try {
+    const r = new Registry();
+    r.loadDict({ '$oojs': '1.0', '$id': 'https://example.org/base', types: { RealType: {} } });
+    r.loadDict({
+      '$oojs': '1.0', '$id': 'https://example.org/child',
+      imports: { base: 'https://example.org/base' },
+      types: { Foo: { properties: { bar: { type: 'base.GhostType' } } } },
+    });
+  } catch (e) { threw = true; assert(e instanceof SchemaError && /not found/i.test(e.message)); }
+  assert(threw, 'expected SchemaError');
+});
+
 // ---------------------------------------------------------------------------
 // Discriminator (§7, §9.2 Phase 1)
 // ---------------------------------------------------------------------------
@@ -968,15 +997,18 @@ test('TypeRef: non-object value gives TYPE_MISMATCH', () => {
   assert(hasCode(errs, ErrorCode.TYPE_MISMATCH));
 });
 
-test('TypeRef: unresolvable type gives UNKNOWN_TYPE', () => {
-  const r = new Registry();
-  r.loadDict({
-    '$oojs': '1.0', '$id': 'https://example.org/schemas/ref-unknown',
-    types: { Parent: { properties: { child: { type: 'MissingType' } }, required: ['child'] } },
-  });
-  const schema = r.getSchema('https://example.org/schemas/ref-unknown');
-  const errs = validate({ _type: 'Parent', child: { x: 1 } }, schema.types['Parent'], schema, r);
-  assert(hasCode(errs, ErrorCode.UNKNOWN_TYPE));
+test('TypeRef: unresolvable type caught at load time', () => {
+  // Unresolvable TypeRef property references are caught at load time via eager
+  // resolution (§A.3), not deferred to validation time.
+  let threw = false;
+  try {
+    const r = new Registry();
+    r.loadDict({
+      '$oojs': '1.0', '$id': 'https://example.org/schemas/ref-unknown',
+      types: { Parent: { properties: { child: { type: 'MissingType' } }, required: ['child'] } },
+    });
+  } catch (e) { threw = true; assert(e instanceof SchemaError && /not found/i.test(e.message)); }
+  assert(threw, 'expected SchemaError');
 });
 
 test('TypeRef: resolves via imports', () => {

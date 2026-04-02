@@ -387,7 +387,7 @@ public class Validator {
                 }
                 String targetTypeName = (String) targetTypeNameObj;
                 TypeDef targetTypedef = registry.lookupByDiscriminatorValue(targetTypeName);
-                TypeDef refTypedef = registry.resolveTypeIn(prop.typeName, schema.schemaId);
+                TypeDef refTypedef = prop.resolvedType;
                 if (targetTypedef == null || refTypedef == null) {
                     errors.add(new ValidationError(path, ErrorCode.UNKNOWN_TYPE,
                             "cannot resolve type '" + prop.typeName + "'"));
@@ -407,20 +407,12 @@ public class Validator {
             return !failFast;
         }
 
-        TypeDef refTypedef = registry.resolveTypeIn(prop.typeName, schema.schemaId);
-
-        if (refTypedef == null && prop.typeName.contains(".")) {
-            String[] parts = prop.typeName.split("\\.", 2);
-            String importedId = schema.imports.get(parts[0]);
-            if (importedId != null) {
-                Schema importedSchema = registry.getSchema(importedId);
-                if (importedSchema != null) refTypedef = importedSchema.types.get(parts[1]);
-            }
-        }
-
+        // resolvedType is guaranteed non-null by eager registry resolution (§A.3).
+        // A null here indicates a schema that bypassed the registry load path.
+        TypeDef refTypedef = prop.resolvedType;
         if (refTypedef == null) {
             errors.add(new ValidationError(path, ErrorCode.UNKNOWN_TYPE,
-                    "cannot resolve type '" + prop.typeName + "'"));
+                    "type reference '" + prop.typeName + "' was not resolved at load time"));
             return !failFast;
         }
 

@@ -160,6 +160,10 @@ public class Registry {
         // Pass 2: resolve hierarchy
         resolveHierarchy(schema, source);
 
+        // Pass 3: eagerly resolve TypeRef property type names to TypeDef objects.
+        // Broken references are caught at load time, not deferred to validation (§A.3).
+        resolvePropertyTypeRefs(schema, source);
+
         // Check required entries reference own properties only
         for (Map.Entry<String, TypeDef> entry : schema.types.entrySet()) {
             String typeName = entry.getKey();
@@ -380,6 +384,31 @@ public class Registry {
     // ------------------------------------------------------------------
     // Hierarchy resolution
     // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Property type-reference resolution (pass 3)
+    // ------------------------------------------------------------------
+
+    private void resolvePropertyTypeRefs(org.oojs.model.Schema schema, String source) {
+        for (Map.Entry<String, TypeDef> typeEntry : schema.types.entrySet()) {
+            String typeName = typeEntry.getKey();
+            for (Map.Entry<String, PropertyDef> propEntry : typeEntry.getValue().ownProperties.entrySet()) {
+                resolvePropertyTypeRef(propEntry.getValue(), schema, source,
+                        "type '" + typeName + "', property '" + propEntry.getKey() + "'");
+            }
+        }
+    }
+
+    private void resolvePropertyTypeRef(PropertyDef prop, org.oojs.model.Schema schema,
+            String source, String context) {
+        if (prop instanceof TypeRefProperty) {
+            TypeRefProperty trp = (TypeRefProperty) prop;
+            trp.resolvedType = resolveTypeRef(trp.typeName, schema, source, context);
+        } else if (prop instanceof ArrayProperty) {
+            resolvePropertyTypeRef(((ArrayProperty) prop).items, schema, source, context + ".items");
+        }
+        // PrimitiveProperty has no type references to resolve
+    }
 
     private void resolveHierarchy(org.oojs.model.Schema schema, String source) {
         for (Map.Entry<String, TypeDef> entry : schema.types.entrySet()) {

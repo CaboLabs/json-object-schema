@@ -193,6 +193,29 @@ describe('SchemaLoading', () => {
       },
     })).toThrowError(/nested array/i);
   });
+
+  it('property TypeRef to unknown type fails at load time', () => {
+    // A TypeRef in a property that names a non-existent type must be caught
+    // at load time, not silently deferred to validation time (§A.3).
+    expect(() => makeRegistry({
+      '$oojs': '1.0', '$id': 'x',
+      types: { Foo: { properties: { bar: { type: 'NonExistentType' } } } },
+    })).toThrowError(/not found/i);
+  });
+
+  it('property TypeRef to unknown type in import fails at load time', () => {
+    // A qualified TypeRef (alias.TypeName) where the type does not exist in the
+    // imported schema must also be caught at load time (§A.3).
+    expect(() => {
+      const r = new Registry();
+      r.loadDict({ '$oojs': '1.0', '$id': 'https://example.org/base', types: { RealType: {} } });
+      r.loadDict({
+        '$oojs': '1.0', '$id': 'https://example.org/child',
+        imports: { base: 'https://example.org/base' },
+        types: { Foo: { properties: { bar: { type: 'base.GhostType' } } } },
+      });
+    }).toThrowError(/not found/i);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -735,11 +758,13 @@ describe('TypeRef', () => {
     expect(hasCode(validate({ _type: 'Parent', child: 'nope' }, schema.types['Parent'], schema, r), ErrorCode.TYPE_MISMATCH)).toBe(true);
   });
 
-  it('unresolvable type gives UNKNOWN_TYPE', () => {
-    const r = new Registry();
-    r.loadDict({ '$oojs': '1.0', '$id': 'https://example.org/schemas/ref-unknown', types: { Parent: { properties: { child: { type: 'MissingType' } }, required: ['child'] } } });
-    const schema = r.getSchema('https://example.org/schemas/ref-unknown')!;
-    expect(hasCode(validate({ _type: 'Parent', child: { x: 1 } }, schema.types['Parent'], schema, r), ErrorCode.UNKNOWN_TYPE)).toBe(true);
+  it('unresolvable type caught at load time', () => {
+    // Unresolvable TypeRef property references are caught at load time via eager
+    // resolution (§A.3), not deferred to validation time.
+    expect(() => {
+      const r = new Registry();
+      r.loadDict({ '$oojs': '1.0', '$id': 'https://example.org/schemas/ref-unknown', types: { Parent: { properties: { child: { type: 'MissingType' } }, required: ['child'] } } });
+    }).toThrowError(/not found/i);
   });
 
   it('resolves via imports', () => {
