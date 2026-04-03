@@ -2,7 +2,7 @@
   "$oojs": "1.0",
   "$id":   "https://example.org/schemas/graph-document",
   "title": "Graph Document — Employees and Departments",
-  "description": "Schema for the graph-document.json example (§8.12). Demonstrates horizontal relationships expressed via { \"$ref-id\": \"...\" } within a single graph document: Employee.department (has-one → Department) and Employee.manager (optional has-one → Employee, self-referential).",
+  "description": "Schema for the graph-document.json example (§8.12). Demonstrates TypeRefProperty relationships expressed via { \"$ref-id\": \"...\" } within a single graph document: Employee.department (has-one → Department) and Employee.manager (optional has-one → Employee, self-referential). Using $ref-id keeps objects independent (no embedding) while preserving full type validation — the validator resolves each $ref-id to its target object and validates it against the declared type.",
   "discriminator": "$type",
 
   "types": {
@@ -19,17 +19,17 @@
 
     "Employee": {
       "title": "Employee",
-      "description": "An employee belonging to a Department. HAS-ONE HORIZONTAL → Department via $ref-id (the Department object is stored separately in 'objects' and shared across Employees). Optional HAS-ONE HORIZONTAL → Employee (self-referential manager link).",
+      "description": "An employee belonging to a Department. HAS-ONE (TypeRefProperty) → Department: in a graph document the value is expressed as { \"$ref-id\": \"<dept-$id>\" } instead of an inline embedded object, so the Department can be stored once and shared. Optional HAS-ONE (TypeRefProperty) → Employee (self-referential manager link).",
       "properties": {
         "employeeId": { "type": "string", "minLength": 1, "description": "Unique identifier" },
         "name":       { "type": "string", "minLength": 1 },
         "department": {
           "type": "Department",
-          "description": "HAS-ONE HORIZONTAL: in a graph document this is expressed as { \"$ref-id\": \"<dept-$id>\" } rather than a bare ID string or an embedded object."
+          "description": "HAS-ONE via TypeRefProperty: in a graph document this property holds { \"$ref-id\": \"<dept-$id>\" } instead of an inline embedded Department. The validator resolves the reference and validates the target against the Department type definition."
         },
         "manager": {
           "type": "Employee",
-          "description": "Optional HAS-ONE HORIZONTAL (self-referential): the employee's direct manager, also expressed as a $ref-id reference."
+          "description": "Optional HAS-ONE via TypeRefProperty (self-referential): the employee's direct manager, expressed as a $ref-id reference in the graph document."
         }
       },
       "required": ["employeeId", "name", "department"]

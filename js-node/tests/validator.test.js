@@ -1,5 +1,5 @@
 /**
- * OOJS validator conformance tests (§12.2) — browser ES module edition.
+ * OOJS validator conformance tests (§12.2) — Node.js edition.
  * Mirrors the Python/PHP test suites; no server required (inline test data).
  */
 

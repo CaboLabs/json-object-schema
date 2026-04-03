@@ -4,8 +4,8 @@ import json
 import pytest
 from pathlib import Path
 
-from python import Registry, SchemaError, ValidationError
-from python.validator import ErrorCode, Validator, validate
+from oojs import Registry, SchemaError, ValidationError
+from oojs.validator import ErrorCode, Validator, validate
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 

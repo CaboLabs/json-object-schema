@@ -4,7 +4,7 @@
   "valid": [
 
     {
-      "_comment": "All four relationships present. address: has-one vertical (embedded). badges: has-many vertical (embedded array). departmentId: has-one horizontal (ID ref). projectIds: has-many horizontal (ID array).",
+      "_comment": "All four relationships present. address: has-one vertical (embedded). badges: has-many vertical (embedded array). department: has-one horizontal (ID ref via refType). projects: has-many horizontal (ID array via refType).",
       "_type":        "Employee",
       "employeeId":   "emp-001",
       "name":         "Alice",
@@ -18,16 +18,16 @@
         { "_type": "Badge", "badgeId": "bdg-001", "label": "Safety", "level": 3 },
         { "_type": "Badge", "badgeId": "bdg-002", "label": "Leadership" }
       ],
-      "departmentId": "dept-eng",
-      "projectIds":   ["proj-alpha", "proj-beta"]
+      "department": "dept-eng",
+      "projects":   ["proj-alpha", "proj-beta"]
     },
 
     {
-      "_comment": "Only required fields: employeeId, name, departmentId. The two optional relationships (address, badges, projectIds) may be omitted.",
+      "_comment": "Only required fields: employeeId, name, department. The optional relationships (address, badges, projects) may be omitted.",
       "_type":        "Employee",
       "employeeId":   "emp-002",
       "name":         "Bob",
-      "departmentId": "dept-ops"
+      "department":   "dept-ops"
     },
 
     {
@@ -40,9 +40,9 @@
         "street": "99 Elm Ave",
         "city":   "Shelbyville"
       },
-      "badges":       [],
-      "departmentId": "dept-hr",
-      "projectIds":   ["proj-gamma"]
+      "badges":     [],
+      "department": "dept-hr",
+      "projects":   ["proj-gamma"]
     },
 
     {
@@ -50,7 +50,7 @@
       "_type":        "Employee",
       "employeeId":   "emp-004",
       "name":         "Dave",
-      "departmentId": "dept-eng",
+      "department":   "dept-eng",
       "badges": [
         { "_type": "Badge", "badgeId": "bdg-010", "label": "Pioneer", "level": 5 }
       ]
@@ -61,7 +61,7 @@
   "invalid": [
 
     {
-      "_comment": "ERROR (has-one horizontal): departmentId is required but absent. The owning side of a horizontal relationship must always carry the reference.",
+      "_comment": "ERROR (has-one horizontal): department is required but absent. The owning side of a horizontal relationship must always carry the reference.",
       "_type":      "Employee",
       "employeeId": "emp-bad-001",
       "name":       "Missing Department"
@@ -72,7 +72,7 @@
       "_type":        "Employee",
       "employeeId":   "emp-bad-002",
       "name":         "Bad Address",
-      "departmentId": "dept-eng",
+      "department":   "dept-eng",
       "address": {
         "_type": "Address",
         "city":  "Nowhere"
@@ -84,7 +84,7 @@
       "_type":        "Employee",
       "employeeId":   "emp-bad-003",
       "name":         "Bad Badge",
-      "departmentId": "dept-eng",
+      "department":   "dept-eng",
       "badges": [
         { "_type": "Badge", "badgeId": "bdg-ok",  "label": "OK" },
         { "_type": "Badge", "badgeId": "bdg-bad" }
@@ -92,20 +92,20 @@
     },
 
     {
-      "_comment": "ERROR (has-one horizontal): departmentId must be a string, not an integer.",
+      "_comment": "ERROR (has-one horizontal): department must be a string (ID), not an integer.",
       "_type":        "Employee",
       "employeeId":   "emp-bad-004",
       "name":         "Bad Dept Type",
-      "departmentId": 42
+      "department":   42
     },
 
     {
-      "_comment": "ERROR (has-many horizontal): each element of projectIds must be a string. An integer ID is not valid.",
+      "_comment": "ERROR (has-many horizontal): each element of projects must be a string (ID). An integer ID is not valid.",
       "_type":        "Employee",
       "employeeId":   "emp-bad-005",
       "name":         "Bad Project IDs",
-      "departmentId": "dept-eng",
-      "projectIds":   ["proj-ok", 99]
+      "department":   "dept-eng",
+      "projects":     ["proj-ok", 99]
     },
 
     {
@@ -113,8 +113,16 @@
       "_type":        "Employee",
       "employeeId":   "emp-bad-006",
       "name":         "Badges Not Array",
-      "departmentId": "dept-eng",
+      "department":   "dept-eng",
       "badges":       { "_type": "Badge", "badgeId": "bdg-001", "label": "Solo" }
+    },
+
+    {
+      "_comment": "ERROR (has-one horizontal): department must be a string ID, not an embedded Department object. Use refType for horizontal references.",
+      "_type":        "Employee",
+      "employeeId":   "emp-bad-007",
+      "name":         "Embedded Dept",
+      "department":   { "_type": "Department", "deptId": "d-1", "name": "Engineering" }
     }
 
   ]

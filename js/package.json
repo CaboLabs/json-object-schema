@@ -1,0 +1,23 @@
+{
+  "name": "@oojs/browser",
+  "version": "1.0.0",
+  "description": "Object-Oriented JSON Schema validator — vanilla JS for browsers",
+  "keywords": ["json-schema", "oojs", "object-oriented", "validation", "schema", "browser"],
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "serve": "python3 -m http.server 8080"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pablopazos/json-object-schema.git",
+    "directory": "js"
+  }
+}

@@ -1,15 +1,49 @@
 {
-  "name": "oojs-ts",
+  "name": "@oojs/core",
   "version": "1.0.0",
-  "description": "Object-Oriented JSON Schema validator — TypeScript implementation",
+  "description": "Object-Oriented JSON Schema validator — TypeScript implementation (Node.js + bundlers)",
+  "keywords": [
+    "json-schema",
+    "oojs",
+    "object-oriented",
+    "validation",
+    "schema",
+    "typescript"
+  ],
+  "license": "MIT",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
+    "build:browser": "esbuild src/index.ts --bundle --format=esm --outfile=dist/oojs.browser.js --platform=browser",
+    "build:all": "npm run build && npm run build:browser",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "@types/node": "^25.5.2",
+    "esbuild": "^0.21.5",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pablopazos/json-object-schema.git",
+    "directory": "ts"
   }
 }

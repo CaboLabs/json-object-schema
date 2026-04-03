@@ -319,7 +319,12 @@ effectiveRequired(T) =
 <a id="sec-6"></a>
 ## 6. Property Definitions
 
-A property definition is a JSON object whose `"type"` member determines its kind.
+A property definition is a JSON object whose kind is determined by one of two mutually exclusive keywords:
+
+- **`"type"`** — present in `PrimitiveProperty`, `TypeRefProperty`, and `ArrayProperty`.
+- **`"refType"`** — present exclusively in `IdRefProperty`.
+
+A property definition MUST contain exactly one of `"type"` or `"refType"`. A definition that contains both or neither is a schema error.
 
 <a id="sec-6-1"></a>
 ### 6.1 Primitive Property
@@ -420,6 +425,45 @@ The keywords `items`, `minItems`, `maxItems`, and `uniqueItems` are adopted from
 When both `minItems` and `maxItems` are present, `minItems` MUST be ≤ `maxItems`.
 
 The `items` object MUST NOT itself be an array property (no nested arrays in v1.0).
+
+The `items` object MAY be an `IdRefProperty` (see [§6.4](#sec-6-4)), in which case each array element is a string ID rather than an embedded object.
+
+<a id="sec-6-4"></a>
+### 6.4 Id Reference Property
+
+```json
+{
+  "refType":     "<TypeName>",
+  "title":       "<string>",
+  "description": "<string>",
+  "minLength":   <integer ≥ 0>,
+  "maxLength":   <integer ≥ 0>,
+  "pattern":     "<string>"
+}
+```
+
+An `IdRefProperty` declares a **typed horizontal reference**: the property value in a JSON instance is a string identifier that refers to an instance of `<TypeName>` stored outside the current document (or elsewhere in a graph document). The schema records the target type explicitly; the validator checks the string value but does NOT validate the referenced object.
+
+`<TypeName>` follows the same resolution rules as `type` in [§6.2](#sec-6-2):
+- A name declared in the current schema: `"Car"`
+- A qualified name from an imported schema: `"fleet.Car"`
+
+The target type MUST exist in the schema registry. Unresolved `refType` references are reported as load errors, exactly like unresolved `type` references (see [§10.2](#sec-10-2) step 5).
+
+**String constraints** from [§6.1.1](#sec-6-1-1) (`minLength`, `maxLength`, `pattern`) MAY be applied to constrain the format of the ID string. `enum` is intentionally excluded — individual ID values are application data, not schema-level constants.
+
+**Has-many via `refType`**: an array whose items are `IdRefProperty` expresses a typed has-many horizontal relationship. Each array element is a string ID:
+
+```json
+"cars": {
+  "type":  "array",
+  "items": { "refType": "Car" }
+}
+```
+
+A valid instance value: `"cars": ["car-001", "car-002"]`
+
+**Rationale**: without `IdRefProperty`, a horizontal relationship can only be expressed as a plain `{ "type": "string" }` property. This loses the target type from the schema, forces an `xxxId` naming convention that diverges from the OO model, and prevents tooling from understanding the relationship. `IdRefProperty` keeps the OO property name, records the target type, and still validates only the string ID.
 
 ---
 
@@ -526,10 +570,12 @@ The `minItems` and `maxItems` constraints on an array property ([§6.3](#sec-6-3
 
 | Cardinality | OOJS representation |
 |-------------|---------------------|
-| Has-one (vertical) | TypeRefProperty with `"type": "TypeName"` |
-| Has-many (vertical) | ArrayProperty with `"items": {"type": "TypeName"}` |
-| Has-one (horizontal) | PrimitiveProperty with `"type": "string"` holding an ID |
-| Has-many (horizontal) | ArrayProperty with `"items": {"type": "string"}` holding IDs |
+| Has-one (vertical) | TypeRefProperty: `"b": { "type": "B" }` |
+| Has-many (vertical) | ArrayProperty with TypeRef items: `"bs": { "type": "array", "items": { "type": "B" } }` |
+| Has-one (horizontal) | IdRefProperty: `"b": { "refType": "B" }` |
+| Has-many (horizontal) | ArrayProperty with IdRef items: `"bs": { "type": "array", "items": { "refType": "B" } }` |
+
+A plain `{ "type": "string" }` property MAY still be used for horizontal references whose target type is not modelled in the schema (opaque/external IDs). `IdRefProperty` is RECOMMENDED whenever the target type is known.
 
 ---
 
@@ -622,41 +668,43 @@ A **horizontal relationship** (also called *non-hierarchical* or *association by
 
 > **Note — this is a property of the relationship, not the type.** The target type definition is not restricted to horizontal use. The same type MAY also appear as the target of a vertical (embedded) relationship declared by a different source type ([§8.8](#sec-8-8)). The choice between horizontal and vertical belongs to each individual property declaration, not to the target type itself.
 
-**Has-one horizontal** — expressed as a string property:
+**Has-one horizontal** — expressed as an `IdRefProperty` ([§6.4](#sec-6-4)):
 
 ```json
 "Car": {
   "properties": {
-    "carId":   { "type": "string" },
-    "make":    { "type": "string" },
-    "model":   { "type": "string" },
-    "ownerId": { "type": "string" }
+    "carId": { "type": "string" },
+    "make":  { "type": "string" },
+    "model": { "type": "string" },
+    "owner": { "refType": "Person" }
   },
-  "required": ["carId", "make", "model", "ownerId"]
+  "required": ["carId", "make", "model", "owner"]
 }
 ```
 
-A valid `Car` instance carries the owner's ID, not the owner's full object:
+A valid `Car` instance carries the owner's ID string, not the owner's full object:
 
 ```json
 {
-  "_type":   "Car",
-  "carId":   "car-001",
-  "make":    "Acme",
-  "model":   "Roadster",
-  "ownerId": "person-007"
+  "_type": "Car",
+  "carId": "car-001",
+  "make":  "Acme",
+  "model": "Roadster",
+  "owner": "person-007"
 }
 ```
 
-**Has-many horizontal** — expressed as an array of strings:
+The property is named `owner` (matching the OO model's `owner: Person` declaration), not `ownerId`. The target type `Person` is explicit in the schema; the validator confirms the value is a string and does not follow the reference.
+
+**Has-many horizontal** — expressed as an array with `IdRefProperty` items:
 
 ```json
 "Fleet": {
   "properties": {
-    "fleetId":   { "type": "string" },
-    "name":      { "type": "string" },
-    "carIds":    { "type": "array", "items": { "type": "string" } },
-    "personIds": { "type": "array", "items": { "type": "string" } }
+    "fleetId": { "type": "string" },
+    "name":    { "type": "string" },
+    "cars":    { "type": "array", "items": { "refType": "Car" } },
+    "persons": { "type": "array", "items": { "refType": "Person" } }
   },
   "required": ["fleetId", "name"]
 }
@@ -666,11 +714,11 @@ A valid `Fleet` instance holds only IDs; the `Car` and `Person` objects are fetc
 
 ```json
 {
-  "_type":     "Fleet",
-  "fleetId":   "fleet-001",
-  "name":      "City Fleet",
-  "carIds":    ["car-001", "car-002", "car-003"],
-  "personIds": ["person-007", "person-008"]
+  "_type":   "Fleet",
+  "fleetId": "fleet-001",
+  "name":    "City Fleet",
+  "cars":    ["car-001", "car-002", "car-003"],
+  "persons": ["person-007", "person-008"]
 }
 ```
 
@@ -1187,7 +1235,19 @@ for key in I:
 
 ```
 function validateProperty(value V, propertyDefinition P, path, registry R):
-    if P.type == "array":
+    if P is IdRefProperty:          # refType — typed horizontal reference
+        if V is not a string:
+            error(path, code=TYPE_MISMATCH)
+            return
+        if P.minLength defined and unicodeLength(V) < P.minLength:
+            error(path, code=STRING_TOO_SHORT)
+        if P.maxLength defined and unicodeLength(V) > P.maxLength:
+            error(path, code=STRING_TOO_LONG)
+        if P.pattern defined and not regexMatch(P.pattern, V):
+            error(path, code=PATTERN_MISMATCH)
+        return   # do NOT follow the reference; do NOT validate the target object
+
+    else if P.type == "array":
         if V is not a JSON array:
             error(path, code=TYPE_MISMATCH)
         if len(V) < P.minItems:
@@ -1202,10 +1262,10 @@ function validateProperty(value V, propertyDefinition P, path, registry R):
     else if P.type in PRIMITIVE_TYPES:
         validatePrimitive(V, P, path)
 
-    else:  # type reference
+    else:  # TypeRefProperty — embedded type reference
         if V is not a JSON object:
             error(path, code=TYPE_MISMATCH)
-        refType = R.lookupByName(P.type)
+        refType = P.resolvedType   # resolved at load time
         validate(V, refType, R)   # recursive call (Phase 1–4)
 ```
 
@@ -1324,7 +1384,7 @@ When loading a schema:
 2. Validate the schema document structure against this specification ([§4](#sec-4), [§5](#sec-5), [§6](#sec-6)).
 3. Check `$id` uniqueness in the registry. If already loaded, skip (idempotent) or error (strict mode). See **Note** below.
 4. Resolve `imports`: for each alias → URI, load the target schema (recursively) and register the alias mapping.
-5. Resolve all `extends` references and type references within `properties`. Report unresolved references as load errors.
+5. Resolve all `extends` references, `type` references (TypeRefProperty), and `refType` references (IdRefProperty) within `properties`. Report unresolved references as load errors.
 6. Build the type hierarchy. Detect and report cycles.
 7. Check discriminator value uniqueness across all loaded schemas.
 8. Index types by discriminator value (O(1) lookup).
@@ -1520,6 +1580,23 @@ Processors targeting OpenAPI 3.x tooling MAY additionally emit a `discriminator`
 ```
 
 The `discriminator` object is an OpenAPI 3.x extension [OPENAPI] and is not part of JSON Schema 2020-12. Emitting it does not affect the JSON Schema validity of the output document; it is purely advisory for OpenAPI tooling.
+
+<a id="sec-13-5"></a>
+### 13.5 Id Reference Property → `{ "type": "string" }`
+
+An `IdRefProperty` (`refType`) maps to a JSON Schema string property. The `refType` target type name has no JSON Schema equivalent — it is OOJS metadata used for type-checking at schema load time and for tooling. String constraints (`minLength`, `maxLength`, `pattern`) are emitted directly.
+
+Example OOJS:
+```json
+"owner": { "refType": "Person", "minLength": 1 }
+```
+
+Emitted JSON Schema:
+```json
+"owner": { "type": "string", "minLength": 1 }
+```
+
+The target type annotation (`Person`) is intentionally dropped in the JSON Schema output because JSON Schema has no concept of typed string references. Tooling that needs the target type MUST consume the OOJS schema directly rather than the derived JSON Schema.
 
 ---
 

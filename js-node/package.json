@@ -1,0 +1,26 @@
+{
+  "name": "@oojs/node",
+  "version": "1.0.0",
+  "description": "Object-Oriented JSON Schema validator — vanilla JS for Node.js",
+  "keywords": ["json-schema", "oojs", "object-oriented", "validation", "schema", "nodejs"],
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test tests/validator.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pablopazos/json-object-schema.git",
+    "directory": "js-node"
+  }
+}

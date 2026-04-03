@@ -95,10 +95,36 @@ export class TypeRefProperty {
   }
 }
 
-export type PropertyDef = PrimitiveProperty | TypeRefProperty | ArrayProperty;
+/**
+ * A property that holds a string ID referencing another typed object (typed horizontal reference).
+ *
+ * In JSON instances the value is a plain string (the ID). The validator checks
+ * the value is a string but does NOT follow or validate the referenced object.
+ */
+export class IdRefProperty {
+  typeName: string;
+  title: string;
+  description: string;
+  minLength: number | null;
+  maxLength: number | null;
+  pattern: string | null;
+  /** Resolved at load time by Registry. Never null after successful schema load. */
+  resolvedType: TypeDef | null = null;
+
+  constructor(typeName: string) {
+    this.typeName = typeName;
+    this.title = '';
+    this.description = '';
+    this.minLength = null;
+    this.maxLength = null;
+    this.pattern = null;
+  }
+}
+
+export type PropertyDef = PrimitiveProperty | IdRefProperty | TypeRefProperty | ArrayProperty;
 
 export class ArrayProperty {
-  items: PrimitiveProperty | TypeRefProperty;
+  items: PrimitiveProperty | IdRefProperty | TypeRefProperty;
   minItems: number;
   maxItems: number | null;
   uniqueItems: boolean;
@@ -113,7 +139,7 @@ export class ArrayProperty {
     title = '',
     description = '',
   }: {
-    items: PrimitiveProperty | TypeRefProperty;
+    items: PrimitiveProperty | IdRefProperty | TypeRefProperty;
     minItems?: number;
     maxItems?: number | null;
     uniqueItems?: boolean;

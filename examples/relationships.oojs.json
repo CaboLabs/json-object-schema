@@ -9,7 +9,7 @@
 
     "Address": {
       "title": "Address",
-      "description": "Embedded value object. No independent identity — exists only inside its owning Employee. Used as the target of a HAS-ONE VERTICAL relationship.",
+      "description": "A postal address. In this schema it is used as the target of a HAS-ONE VERTICAL relationship from Employee, but nothing in the type definition restricts it to that use — another source type could reference Address horizontally by ID.",
       "properties": {
         "street":  { "type": "string", "minLength": 1 },
         "city":    { "type": "string", "minLength": 1 },
@@ -20,7 +20,7 @@
 
     "Badge": {
       "title": "Badge",
-      "description": "Embedded value object. Each Employee can carry multiple badges. Used as the item type of a HAS-MANY VERTICAL relationship.",
+      "description": "An achievement or certification badge. In this schema it is used as the item type of a HAS-MANY VERTICAL relationship from Employee, but nothing in the type definition restricts it to that use.",
       "properties": {
         "badgeId": { "type": "string", "minLength": 1 },
         "label":   { "type": "string", "minLength": 1 },
@@ -29,9 +29,29 @@
       "required": ["badgeId", "label"]
     },
 
+    "Department": {
+      "title": "Department",
+      "description": "An organisational department. Referenced horizontally by ID from Employee.",
+      "properties": {
+        "deptId": { "type": "string", "minLength": 1 },
+        "name":   { "type": "string", "minLength": 1 }
+      },
+      "required": ["deptId", "name"]
+    },
+
+    "Project": {
+      "title": "Project",
+      "description": "A work project. Referenced horizontally by ID from Employee.",
+      "properties": {
+        "projectId": { "type": "string", "minLength": 1 },
+        "title":     { "type": "string", "minLength": 1 }
+      },
+      "required": ["projectId", "title"]
+    },
+
     "Employee": {
       "title": "Employee",
-      "description": "Carries all four relationship patterns from §8.7 in a single type. address: HAS-ONE VERTICAL (embedded Address). badges: HAS-MANY VERTICAL (embedded Badge array). departmentId: HAS-ONE HORIZONTAL (Department referenced by ID). projectIds: HAS-MANY HORIZONTAL (Projects referenced by ID array).",
+      "description": "Carries all four relationship patterns from §8.7 in a single type. address: HAS-ONE VERTICAL (embedded Address). badges: HAS-MANY VERTICAL (embedded Badge array). department: HAS-ONE HORIZONTAL (Department referenced by ID via refType). projects: HAS-MANY HORIZONTAL (Projects referenced by ID array via refType).",
       "properties": {
         "employeeId": { "type": "string", "minLength": 1, "description": "Unique identifier" },
         "name":       { "type": "string", "minLength": 1 },
@@ -47,19 +67,19 @@
           "description": "HAS-MANY VERTICAL (§8.7, §8.8): each Badge is embedded directly in this Employee's JSON. Zero or more badges are allowed."
         },
 
-        "departmentId": {
-          "type": "string",
+        "department": {
+          "refType": "Department",
           "minLength": 1,
-          "description": "HAS-ONE HORIZONTAL (§8.7, §8.9): references the owning Department by its identifier. The Department object is NOT embedded — it lives in a separate document or data store."
+          "description": "HAS-ONE HORIZONTAL (§8.7, §8.9): references the owning Department by its identifier string. The Department object is NOT embedded — it lives in a separate document or data store."
         },
 
-        "projectIds": {
+        "projects": {
           "type":  "array",
-          "items": { "type": "string" },
-          "description": "HAS-MANY HORIZONTAL (§8.7, §8.9): references zero or more Projects by their identifiers. Project objects are NOT embedded."
+          "items": { "refType": "Project" },
+          "description": "HAS-MANY HORIZONTAL (§8.7, §8.9): references zero or more Projects by their identifier strings. Project objects are NOT embedded."
         }
       },
-      "required": ["employeeId", "name", "departmentId"]
+      "required": ["employeeId", "name", "department"]
     }
 
   }

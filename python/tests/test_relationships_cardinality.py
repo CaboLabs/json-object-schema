@@ -8,8 +8,8 @@ The matrix:
   Vertical   | TypeRefProperty      | ArrayProperty{items:TypeRef}
   (embedded) | Employee.address     | Employee.badges
   -----------+----------------------+-----------------------------
-  Horizontal | PrimitiveProperty    | ArrayProperty{items:string}
-  (ID ref)   | Employee.departmentId| Employee.projectIds
+  Horizontal | IdRefProperty    | ArrayProperty{items:IdRef}
+  (ID ref)   | Employee.department| Employee.projects
 
 Uses the relationships.oojs.json / relationships-instances.json example fixtures.
 """
@@ -19,8 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from python import Registry
-from python.validator import ErrorCode, validate
+from oojs import Registry
+from oojs.validator import ErrorCode, validate
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 
@@ -69,7 +69,7 @@ class TestHasOneVertical:
             "_type": "Employee",
             "employeeId": "emp-001",
             "name": "Alice",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
             "address": {"_type": "Address", "street": "1 Main St", "city": "Springfield"},
         }
         assert validate(emp, schema.types["Employee"], schema, r) == []
@@ -80,7 +80,7 @@ class TestHasOneVertical:
             "_type": "Employee",
             "employeeId": "emp-002",
             "name": "Bob",
-            "departmentId": "dept-ops",
+            "department": "dept-ops",
         }
         assert validate(emp, schema.types["Employee"], schema, r) == []
 
@@ -90,7 +90,7 @@ class TestHasOneVertical:
             "_type": "Employee",
             "employeeId": "emp-003",
             "name": "Carol",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
             "address": {"_type": "Address", "city": "Springfield"},  # street absent
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
@@ -102,7 +102,7 @@ class TestHasOneVertical:
             "_type": "Employee",
             "employeeId": "emp-004",
             "name": "Dave",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
             "address": {"_type": "Badge", "badgeId": "b-1", "label": "X"},
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
@@ -114,7 +114,7 @@ class TestHasOneVertical:
             "_type": "Employee",
             "employeeId": "emp-005",
             "name": "Eve",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
             "address": "not-an-object",
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
@@ -132,7 +132,7 @@ class TestHasManyVertical:
             "_type": "Employee",
             "employeeId": "emp-010",
             "name": "Frank",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
             "badges": [
                 {"_type": "Badge", "badgeId": "b-1", "label": "Safety", "level": 3},
                 {"_type": "Badge", "badgeId": "b-2", "label": "Leader"},
@@ -146,7 +146,7 @@ class TestHasManyVertical:
             "_type": "Employee",
             "employeeId": "emp-011",
             "name": "Grace",
-            "departmentId": "dept-hr",
+            "department": "dept-hr",
             "badges": [],
         }
         assert validate(emp, schema.types["Employee"], schema, r) == []
@@ -157,7 +157,7 @@ class TestHasManyVertical:
             "_type": "Employee",
             "employeeId": "emp-012",
             "name": "Henry",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
             "badges": [
                 {"_type": "Badge", "badgeId": "b-ok", "label": "OK"},
                 {"_type": "Badge", "badgeId": "b-bad"},  # label absent
@@ -173,7 +173,7 @@ class TestHasManyVertical:
             "_type": "Employee",
             "employeeId": "emp-013",
             "name": "Iris",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
             "badges": [{"_type": "Badge", "badgeId": "b-1", "label": "Expert", "level": 10}],
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
@@ -185,7 +185,7 @@ class TestHasManyVertical:
             "_type": "Employee",
             "employeeId": "emp-014",
             "name": "Jack",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
             "badges": {"_type": "Badge", "badgeId": "b-1", "label": "X"},
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
@@ -193,7 +193,7 @@ class TestHasManyVertical:
 
 
 # ---------------------------------------------------------------------------
-# §8.7 — Has-one horizontal (Employee.departmentId → ID string)
+# §8.7 — Has-one horizontal (Employee.department → ID string)
 # ---------------------------------------------------------------------------
 
 class TestHasOneHorizontal:
@@ -203,7 +203,7 @@ class TestHasOneHorizontal:
             "_type": "Employee",
             "employeeId": "emp-020",
             "name": "Karen",
-            "departmentId": "dept-eng",
+            "department": "dept-eng",
         }
         assert validate(emp, schema.types["Employee"], schema, r) == []
 
@@ -213,7 +213,7 @@ class TestHasOneHorizontal:
             "_type": "Employee",
             "employeeId": "emp-021",
             "name": "Leo",
-            # departmentId absent
+            # department absent
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
         assert any(e.code == ErrorCode.MISSING_REQUIRED for e in errs)
@@ -224,7 +224,7 @@ class TestHasOneHorizontal:
             "_type": "Employee",
             "employeeId": "emp-022",
             "name": "Mia",
-            "departmentId": 42,
+            "department": 42,
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
         assert any(e.code == ErrorCode.TYPE_MISMATCH for e in errs)
@@ -235,26 +235,26 @@ class TestHasOneHorizontal:
             "_type": "Employee",
             "employeeId": "emp-023",
             "name": "Nick",
-            "departmentId": ["dept-eng"],
+            "department": ["dept-eng"],
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
         assert any(e.code == ErrorCode.TYPE_MISMATCH for e in errs)
 
     def test_minlength_enforced(self, rel_schema_and_registry):
         r, schema = rel_schema_and_registry
-        # departmentId has minLength: 1 — empty string is invalid
+        # department has minLength: 1 — empty string is invalid
         emp = {
             "_type": "Employee",
             "employeeId": "emp-024",
             "name": "Olivia",
-            "departmentId": "",
+            "department": "",
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
         assert any(e.code == ErrorCode.STRING_TOO_SHORT for e in errs)
 
 
 # ---------------------------------------------------------------------------
-# §8.7 — Has-many horizontal (Employee.projectIds → string[] IDs)
+# §8.7 — Has-many horizontal (Employee.projects → string[] IDs)
 # ---------------------------------------------------------------------------
 
 class TestHasManyHorizontal:
@@ -264,8 +264,8 @@ class TestHasManyHorizontal:
             "_type": "Employee",
             "employeeId": "emp-030",
             "name": "Paul",
-            "departmentId": "dept-eng",
-            "projectIds": ["proj-alpha", "proj-beta", "proj-gamma"],
+            "department": "dept-eng",
+            "projects": ["proj-alpha", "proj-beta", "proj-gamma"],
         }
         assert validate(emp, schema.types["Employee"], schema, r) == []
 
@@ -275,8 +275,8 @@ class TestHasManyHorizontal:
             "_type": "Employee",
             "employeeId": "emp-031",
             "name": "Quinn",
-            "departmentId": "dept-eng",
-            "projectIds": [],
+            "department": "dept-eng",
+            "projects": [],
         }
         assert validate(emp, schema.types["Employee"], schema, r) == []
 
@@ -286,8 +286,8 @@ class TestHasManyHorizontal:
             "_type": "Employee",
             "employeeId": "emp-032",
             "name": "Rose",
-            "departmentId": "dept-eng",
-            "projectIds": ["proj-ok", 99],
+            "department": "dept-eng",
+            "projects": ["proj-ok", 99],
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
         assert any(e.code == ErrorCode.TYPE_MISMATCH for e in errs)
@@ -298,8 +298,8 @@ class TestHasManyHorizontal:
             "_type": "Employee",
             "employeeId": "emp-033",
             "name": "Sam",
-            "departmentId": "dept-eng",
-            "projectIds": "proj-alpha",
+            "department": "dept-eng",
+            "projects": "proj-alpha",
         }
         errs = validate(emp, schema.types["Employee"], schema, r)
         assert any(e.code == ErrorCode.TYPE_MISMATCH for e in errs)
@@ -315,7 +315,7 @@ class TestHasManyHorizontal:
                 {"_type": "Badge", "badgeId": "b-1", "label": "Expert", "level": 4},
                 {"_type": "Badge", "badgeId": "b-2", "label": "Mentor"},
             ],
-            "departmentId": "dept-rd",
-            "projectIds": ["proj-x", "proj-y"],
+            "department": "dept-rd",
+            "projects": ["proj-x", "proj-y"],
         }
         assert validate(emp, schema.types["Employee"], schema, r) == []

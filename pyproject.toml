@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oojs"
+version = "1.0.0"
+description = "Object-Oriented JSON Schema validator"
+readme = "python/README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+keywords = ["json-schema", "oojs", "object-oriented", "validation", "schema"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
+
+[project.scripts]
+oojs = "oojs.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/pablopazos/json-object-schema"
+Source = "https://github.com/pablopazos/json-object-schema"
+Issues = "https://github.com/pablopazos/json-object-schema/issues"
+
+[tool.setuptools]
+packages = ["oojs"]
+
+[tool.setuptools.package-dir]
+"oojs" = "python"

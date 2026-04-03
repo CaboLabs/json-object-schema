@@ -1324,7 +1324,7 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-001', name: 'Alice', departmentId: 'dept-eng',
+      _type: 'Employee', employeeId: 'emp-001', name: 'Alice', department: 'dept-eng',
       address: { _type: 'Address', street: '1 Main St', city: 'Springfield' },
     };
     expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
@@ -1333,7 +1333,7 @@ describe('RelationshipsCardinality', () => {
   it('has-one vertical: optional, may be absent', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
-    const emp = { _type: 'Employee', employeeId: 'emp-002', name: 'Bob', departmentId: 'dept-ops' };
+    const emp = { _type: 'Employee', employeeId: 'emp-002', name: 'Bob', department: 'dept-ops' };
     expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
   });
 
@@ -1341,7 +1341,7 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-003', name: 'Carol', departmentId: 'dept-eng',
+      _type: 'Employee', employeeId: 'emp-003', name: 'Carol', department: 'dept-eng',
       address: { _type: 'Address', city: 'Springfield' }, // street absent
     };
     const errs = validate(emp, schema.types.Employee, schema, r);
@@ -1352,7 +1352,7 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-004', name: 'Dave', departmentId: 'dept-eng',
+      _type: 'Employee', employeeId: 'emp-004', name: 'Dave', department: 'dept-eng',
       address: { _type: 'Badge', badgeId: 'b-1', label: 'X' },
     };
     const errs = validate(emp, schema.types.Employee, schema, r);
@@ -1363,7 +1363,7 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-005', name: 'Eve', departmentId: 'dept-eng',
+      _type: 'Employee', employeeId: 'emp-005', name: 'Eve', department: 'dept-eng',
       address: 'not-an-object',
     };
     const errs = validate(emp, schema.types.Employee, schema, r);
@@ -1376,7 +1376,7 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-010', name: 'Frank', departmentId: 'dept-eng',
+      _type: 'Employee', employeeId: 'emp-010', name: 'Frank', department: 'dept-eng',
       badges: [
         { _type: 'Badge', badgeId: 'b-1', label: 'Safety', level: 3 },
         { _type: 'Badge', badgeId: 'b-2', label: 'Leader' },
@@ -1388,7 +1388,7 @@ describe('RelationshipsCardinality', () => {
   it('has-many vertical: valid empty array', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
-    const emp = { _type: 'Employee', employeeId: 'emp-011', name: 'Grace', departmentId: 'dept-hr', badges: [] };
+    const emp = { _type: 'Employee', employeeId: 'emp-011', name: 'Grace', department: 'dept-hr', badges: [] };
     expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
   });
 
@@ -1396,7 +1396,7 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-012', name: 'Henry', departmentId: 'dept-eng',
+      _type: 'Employee', employeeId: 'emp-012', name: 'Henry', department: 'dept-eng',
       badges: [
         { _type: 'Badge', badgeId: 'b-ok', label: 'OK' },
         { _type: 'Badge', badgeId: 'b-bad' }, // label absent
@@ -1410,7 +1410,7 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-013', name: 'Iris', departmentId: 'dept-eng',
+      _type: 'Employee', employeeId: 'emp-013', name: 'Iris', department: 'dept-eng',
       badges: [{ _type: 'Badge', badgeId: 'b-1', label: 'Expert', level: 10 }], // max 5
     };
     const errs = validate(emp, schema.types.Employee, schema, r);
@@ -1421,26 +1421,26 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-014', name: 'Jack', departmentId: 'dept-eng',
+      _type: 'Employee', employeeId: 'emp-014', name: 'Jack', department: 'dept-eng',
       badges: { _type: 'Badge', badgeId: 'b-1', label: 'X' },
     };
     const errs = validate(emp, schema.types.Employee, schema, r);
     expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
   });
 
-  // --- has-one horizontal (departmentId → string ID) ---
+  // --- has-one horizontal (department → Department ID via refType) ---
 
   it('has-one horizontal: valid string id', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
-    const emp = { _type: 'Employee', employeeId: 'emp-020', name: 'Karen', departmentId: 'dept-eng' };
+    const emp = { _type: 'Employee', employeeId: 'emp-020', name: 'Karen', department: 'dept-eng' };
     expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
   });
 
   it('has-one horizontal: required, must be present', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
-    const emp = { _type: 'Employee', employeeId: 'emp-021', name: 'Leo' }; // departmentId absent
+    const emp = { _type: 'Employee', employeeId: 'emp-021', name: 'Leo' }; // department absent
     const errs = validate(emp, schema.types.Employee, schema, r);
     expect(hasCode(errs, ErrorCode.MISSING_REQUIRED)).toBe(true);
   });
@@ -1448,7 +1448,7 @@ describe('RelationshipsCardinality', () => {
   it('has-one horizontal: must be string, not integer', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
-    const emp = { _type: 'Employee', employeeId: 'emp-022', name: 'Mia', departmentId: 42 };
+    const emp = { _type: 'Employee', employeeId: 'emp-022', name: 'Mia', department: 42 };
     const errs = validate(emp, schema.types.Employee, schema, r);
     expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
   });
@@ -1456,7 +1456,7 @@ describe('RelationshipsCardinality', () => {
   it('has-one horizontal: must be string, not array', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
-    const emp = { _type: 'Employee', employeeId: 'emp-023', name: 'Nick', departmentId: ['dept-eng'] };
+    const emp = { _type: 'Employee', employeeId: 'emp-023', name: 'Nick', department: ['dept-eng'] };
     const errs = validate(emp, schema.types.Employee, schema, r);
     expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
   });
@@ -1464,19 +1464,19 @@ describe('RelationshipsCardinality', () => {
   it('has-one horizontal: minLength enforced — empty string rejected', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
-    const emp = { _type: 'Employee', employeeId: 'emp-024', name: 'Olivia', departmentId: '' };
+    const emp = { _type: 'Employee', employeeId: 'emp-024', name: 'Olivia', department: '' };
     const errs = validate(emp, schema.types.Employee, schema, r);
     expect(hasCode(errs, ErrorCode.STRING_TOO_SHORT)).toBe(true);
   });
 
-  // --- has-many horizontal (projectIds → string[] IDs) ---
+  // --- has-many horizontal (projects → Project ID array via refType) ---
 
   it('has-many horizontal: valid multiple ids', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-030', name: 'Paul', departmentId: 'dept-eng',
-      projectIds: ['proj-alpha', 'proj-beta', 'proj-gamma'],
+      _type: 'Employee', employeeId: 'emp-030', name: 'Paul', department: 'dept-eng',
+      projects: ['proj-alpha', 'proj-beta', 'proj-gamma'],
     };
     expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
   });
@@ -1485,8 +1485,8 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-031', name: 'Quinn', departmentId: 'dept-eng',
-      projectIds: [],
+      _type: 'Employee', employeeId: 'emp-031', name: 'Quinn', department: 'dept-eng',
+      projects: [],
     };
     expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
   });
@@ -1495,8 +1495,8 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-032', name: 'Rose', departmentId: 'dept-eng',
-      projectIds: ['proj-ok', 99],
+      _type: 'Employee', employeeId: 'emp-032', name: 'Rose', department: 'dept-eng',
+      projects: ['proj-ok', 99],
     };
     const errs = validate(emp, schema.types.Employee, schema, r);
     expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
@@ -1506,8 +1506,8 @@ describe('RelationshipsCardinality', () => {
     const r = new Registry();
     const schema = r.loadDict(relationshipsSchema());
     const emp = {
-      _type: 'Employee', employeeId: 'emp-033', name: 'Sam', departmentId: 'dept-eng',
-      projectIds: 'proj-alpha',
+      _type: 'Employee', employeeId: 'emp-033', name: 'Sam', department: 'dept-eng',
+      projects: 'proj-alpha',
     };
     const errs = validate(emp, schema.types.Employee, schema, r);
     expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
@@ -1523,9 +1523,149 @@ describe('RelationshipsCardinality', () => {
         { _type: 'Badge', badgeId: 'b-1', label: 'Expert', level: 4 },
         { _type: 'Badge', badgeId: 'b-2', label: 'Mentor' },
       ],
-      departmentId: 'dept-rd',
-      projectIds: ['proj-x', 'proj-y'],
+      department: 'dept-rd',
+      projects: ['proj-x', 'proj-y'],
     };
     expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §6.4 — IdRefProperty (refType)
+// ---------------------------------------------------------------------------
+
+function idRefSchema() {
+  return {
+    '$oojs': '1.0', '$id': 'https://example.org/schemas/idref',
+    discriminator: '_type',
+    types: {
+      Department: {
+        properties: {
+          deptId: { type: 'string', minLength: 1 },
+          name:   { type: 'string', minLength: 1 },
+        },
+        required: ['deptId', 'name'],
+      },
+      Project: {
+        properties: {
+          projectId: { type: 'string', minLength: 1 },
+          title:     { type: 'string', minLength: 1 },
+        },
+        required: ['projectId', 'title'],
+      },
+      Employee: {
+        properties: {
+          employeeId: { type: 'string', minLength: 1 },
+          name:       { type: 'string', minLength: 1 },
+          department: { refType: 'Department', minLength: 1 },
+          projects:   { type: 'array', items: { refType: 'Project' } },
+        },
+        required: ['employeeId', 'name', 'department'],
+      },
+    },
+  };
+}
+
+describe('IdRefProperty (§6.4)', () => {
+  it('valid string id is accepted', () => {
+    const r = new Registry();
+    const schema = r.loadDict(idRefSchema());
+    const emp = { _type: 'Employee', employeeId: 'e-1', name: 'Alice', department: 'dept-eng' };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('non-string value rejected with TYPE_MISMATCH', () => {
+    const r = new Registry();
+    const schema = r.loadDict(idRefSchema());
+    const emp = { _type: 'Employee', employeeId: 'e-2', name: 'Bob', department: 42 };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('object value rejected with TYPE_MISMATCH', () => {
+    const r = new Registry();
+    const schema = r.loadDict(idRefSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'e-3', name: 'Carol',
+      department: { _type: 'Department', deptId: 'd-1', name: 'Eng' },
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('minLength constraint enforced', () => {
+    const r = new Registry();
+    const schema = r.loadDict(idRefSchema());
+    const emp = { _type: 'Employee', employeeId: 'e-4', name: 'Dave', department: '' };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.STRING_TOO_SHORT)).toBe(true);
+  });
+
+  it('array of refType ids valid', () => {
+    const r = new Registry();
+    const schema = r.loadDict(idRefSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'e-5', name: 'Eve',
+      department: 'dept-ops', projects: ['proj-a', 'proj-b'],
+    };
+    expect(validate(emp, schema.types.Employee, schema, r)).toEqual([]);
+  });
+
+  it('array item that is not a string rejected', () => {
+    const r = new Registry();
+    const schema = r.loadDict(idRefSchema());
+    const emp = {
+      _type: 'Employee', employeeId: 'e-6', name: 'Frank',
+      department: 'dept-ops', projects: ['proj-a', 99],
+    };
+    const errs = validate(emp, schema.types.Employee, schema, r);
+    expect(hasCode(errs, ErrorCode.TYPE_MISMATCH)).toBe(true);
+  });
+
+  it('unknown refType causes SchemaError at load time', () => {
+    const r = new Registry();
+    expect(() => r.loadDict({
+      '$oojs': '1.0', '$id': 'https://example.org/schemas/bad-idref',
+      types: {
+        Foo: {
+          properties: { bar: { refType: 'NonExistent' } },
+        },
+      },
+    })).toThrow(SchemaError);
+  });
+
+  it('both type and refType on same property causes SchemaError', () => {
+    const r = new Registry();
+    expect(() => r.loadDict({
+      '$oojs': '1.0', '$id': 'https://example.org/schemas/both-kw',
+      types: {
+        Target: { properties: { x: { type: 'string' } } },
+        Src: {
+          properties: { prop: { type: 'Target', refType: 'Target' } },
+        },
+      },
+    })).toThrow(SchemaError);
+  });
+
+  it('pattern constraint enforced on id string', () => {
+    const r = new Registry();
+    const schema = r.loadDict({
+      '$oojs': '1.0', '$id': 'https://example.org/schemas/idref-pattern',
+      types: {
+        Target: { properties: { targetId: { type: 'string' } }, required: ['targetId'] },
+        Source: {
+          properties: {
+            targetRef: { refType: 'Target', pattern: '^[a-z]+-[0-9]+$' },
+          },
+          required: ['targetRef'],
+        },
+      },
+    });
+    const good = { _type: 'Source', targetRef: 'item-42' };
+    expect(validate(good, schema.types.Source, schema, r)).toEqual([]);
+
+    const bad = { _type: 'Source', targetRef: 'ITEM42' };
+    const errs = validate(bad, schema.types.Source, schema, r);
+    expect(hasCode(errs, ErrorCode.PATTERN_MISMATCH)).toBe(true);
   });
 });

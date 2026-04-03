@@ -2,14 +2,14 @@
   "$oojs":  "1.0",
   "$id":    "https://example.org/schemas/car",
   "title":  "Car Domain — Vertical Relationships",
-  "description": "Demonstrates vertical (hierarchical/embedded) has-one and has-many relationships. A Car physically contains its Motor (has-one vertical) and its Wheels (has-many vertical, fixed count). The owned objects have no independent identity outside the Car document.",
+  "description": "Demonstrates vertical (hierarchical/embedded) has-one and has-many relationships. A Car physically contains its Motor (has-one vertical) and its Wheels (has-many vertical, fixed count). The vertical/horizontal choice is made on each property of Car; it does not restrict how Motor or Wheel may be used by other source types.",
   "discriminator": "_type",
 
   "types": {
 
     "Motor": {
       "title":       "Motor",
-      "description": "An internal combustion engine. Has no independent identity — it lives inside its Car.",
+      "description": "An internal combustion engine. In this schema it is embedded vertically inside Car, but the type definition itself does not restrict it to vertical use.",
       "properties": {
         "horsepower":    { "type": "number",  "minimum": 1, "description": "Peak power output in hp" },
         "cylinders":     { "type": "integer", "minimum": 1, "description": "Number of cylinders" },
@@ -21,7 +21,7 @@
 
     "Wheel": {
       "title":       "Wheel",
-      "description": "A single wheel fitted to a car. Lives inside the Car's wheel array.",
+      "description": "A single wheel fitted to a car. In this schema it is embedded vertically inside Car's wheel array, but the type definition itself does not restrict it to vertical use.",
       "properties": {
         "size":     { "type": "number",  "minimum": 10, "description": "Rim diameter in inches" },
         "material": { "type": "string",  "enum": ["rubber", "alloy", "steel"], "description": "Primary material" },

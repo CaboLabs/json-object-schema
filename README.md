@@ -82,6 +82,27 @@ A valid instance:
 - **Cross-schema imports** — reference types from other OOJS schemas by alias
 - **JSON Schema output** — a conforming processor can emit equivalent JSON Schema 2020-12
 
+## Packages
+
+Five ready-to-use implementations, all conforming to the same spec:
+
+| Package | Language | Runtime | Install |
+|---------|----------|---------|---------|
+| [`@oojs/browser`](js/) | JavaScript | Browser (ES modules) | copy `js/src/` or `npm i @oojs/browser` |
+| [`@oojs/node`](js-node/) | JavaScript | Node.js 18+ | `npm i @oojs/node` |
+| [`@oojs/core`](ts/) | TypeScript | Node.js 18+ / bundlers | `npm i @oojs/core` |
+| [`oojs`](python/) | Python | Python 3.10+ | `pip install oojs` |
+| [`oojs/oojs`](php/) | PHP | PHP 8.1+ | `composer require oojs/oojs` |
+
+### Publishing all packages at once
+
+```bash
+./scripts/publish.sh --version 1.2.0
+# Add --dry-run to preview without publishing
+```
+
+The script bumps versions in all `package.json` / `pyproject.toml` / `composer.json` files, builds the TypeScript package, runs `npm publish` for the three JS/TS packages, uploads to PyPI via `twine`, and pushes a git tag for Packagist.
+
 ## Project Structure
 
 ```
@@ -96,6 +117,15 @@ examples/
   core.oojs.json           Base schema for cross-schema imports
   billing.oojs.json        Schema importing `core` via alias-qualified types
   billing-instances.json   Valid and invalid instances for the cross-schema example
+js/                        @oojs/browser — vanilla JS, browser ES modules
+js-node/                   @oojs/node   — vanilla JS, Node.js 18+
+ts/                        @oojs/core   — TypeScript, Node.js + bundlers
+python/                    oojs         — Python 3.10+ reference implementation
+php/                       oojs/oojs    — PHP 8.1+ implementation
+csharp/                    C# implementation
+java/                      Java implementation
+scripts/
+  publish.sh               Automated multi-package release script
 ```
 
 ## Roadmap
@@ -106,8 +136,8 @@ examples/
 | 2 | Done | Conceptual modeling |
 | 3 | Done | Language design |
 | 4 | In progress | Formal specification (RFC-style) |
-| 5 | Planned | Extended examples |
-| 6 | Planned | Reference implementations |
+| 5 | Done | Extended examples |
+| 6 | Done | Reference implementations (JS/TS/Python/PHP/C#/Java) |
 | 7 | Planned | Critical evaluation |
 
 ## Related Standards

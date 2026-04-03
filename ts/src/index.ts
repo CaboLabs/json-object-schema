@@ -5,6 +5,7 @@
 export {
   PRIMITIVE_TYPES,
   PrimitiveProperty,
+  IdRefProperty,
   TypeRefProperty,
   ArrayProperty,
   TypeDef,

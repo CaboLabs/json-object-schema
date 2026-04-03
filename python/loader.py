@@ -14,6 +14,7 @@ from typing import Any
 from .model import (
     PRIMITIVE_TYPES,
     ArrayProperty,
+    IdRefProperty,
     PrimitiveProperty,
     PropertyDef,
     Schema,
@@ -275,6 +276,18 @@ class Registry:
                 f"{source}: property '{prop_name}' in type '{type_name}' "
                 f"must be a JSON object"
             )
+        has_type = "type" in data
+        has_ref_type = "refType" in data
+
+        if has_type and has_ref_type:
+            raise SchemaError(
+                f"{source}: property '{prop_name}' in type '{type_name}' "
+                f"must not have both 'type' and 'refType'"
+            )
+
+        if has_ref_type and not has_type:
+            return self._parse_id_ref_property(prop_name, data, type_name, source)
+
         kind = data.get("type")
         if kind is None:
             raise SchemaError(
@@ -390,6 +403,51 @@ class Registry:
 
         return p
 
+    def _parse_id_ref_property(
+        self, prop_name: str, data: dict, type_name: str, source: str
+    ) -> IdRefProperty:
+        ref_type = data["refType"]
+        if not isinstance(ref_type, str) or not ref_type:
+            raise SchemaError(
+                f"{source}: 'refType' on property '{prop_name}' in '{type_name}' "
+                f"must be a non-empty string"
+            )
+
+        def _int_ge_zero(key: str) -> int | None:
+            v = data.get(key)
+            if v is None:
+                return None
+            if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+                raise SchemaError(
+                    f"{source}: '{key}' on property '{prop_name}' in '{type_name}' "
+                    f"must be a non-negative integer"
+                )
+            return v
+
+        min_length = _int_ge_zero("minLength")
+        max_length = _int_ge_zero("maxLength")
+
+        if min_length is not None and max_length is not None and min_length > max_length:
+            raise SchemaError(
+                f"{source}: 'minLength' > 'maxLength' on '{prop_name}' in '{type_name}'"
+            )
+
+        raw_pattern = data.get("pattern")
+        if raw_pattern is not None and not isinstance(raw_pattern, str):
+            raise SchemaError(
+                f"{source}: 'pattern' on '{prop_name}' must be a string"
+            )
+        pattern = raw_pattern if isinstance(raw_pattern, str) else None
+
+        return IdRefProperty(
+            type_name=ref_type,
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            min_length=min_length,
+            max_length=max_length,
+            pattern=pattern,
+        )
+
     def _parse_array_property(
         self, prop_name: str, data: dict, type_name: str, source: str
     ) -> ArrayProperty:
@@ -476,6 +534,10 @@ class Registry:
         self, prop: PropertyDef, schema: Schema, source: str, context: str
     ) -> None:
         if isinstance(prop, TypeRefProperty):
+            prop.resolved_type = self._resolve_type_ref(
+                prop.type_name, schema, source, context=context
+            )
+        elif isinstance(prop, IdRefProperty):
             prop.resolved_type = self._resolve_type_ref(
                 prop.type_name, schema, source, context=context
             )

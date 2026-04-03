@@ -198,3 +198,25 @@ OOJS schemas are JSON objects with:
 | `null` | `null` | — |
 | `array` | `Array` | `items`, `minItems`, `maxItems`, `uniqueItems` |
 | `TypeName` | object | validated recursively |
+| `refType: "TypeName"` | `string` | ID reference — `minLength`, `maxLength`, `pattern` |
+
+## Publishing (`@oojs/browser`)
+
+This package publishes the `src/` directory as-is — no build step required.
+
+```sh
+# Log in to npm (once)
+npm login
+
+# Publish
+cd js/
+npm publish --access public
+```
+
+To update the version:
+```sh
+npm version patch   # or minor / major
+npm publish --access public
+```
+
+The automated script at `scripts/publish.sh` handles versioning across all packages at once.

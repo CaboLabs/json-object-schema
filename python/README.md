@@ -6,11 +6,14 @@ Requires Python 3.10+ and no third-party dependencies.
 ## Installation
 
 ```bash
-# From the repository root
+# From PyPI
+pip install oojs
+
+# Or editable install from repo root (for development)
 pip install -e .
 ```
 
-Or just copy the `oojs/` package directory into your project — it has zero dependencies.
+Or just copy the `python/` directory into your project and import as `oojs` — it has zero dependencies.
 
 ## Quick Start
 
@@ -243,3 +246,19 @@ pytest python/tests/
 ```
 
 The test suite covers all schema-loading rules, all validation phases, all constraint types, polymorphic dispatch, fail-fast mode, and the clinical integration example.
+
+## Building and Publishing (`oojs` on PyPI)
+
+```bash
+# Install build tools (once)
+pip install build twine
+
+# Build sdist + wheel from the repo root
+python3 -m build
+
+# Upload to PyPI (requires a PyPI account + token)
+python3 -m twine upload dist/oojs-*
+```
+
+The package source lives in `python/` and is exposed as the `oojs` namespace via `pyproject.toml`.
+The automated script `scripts/publish.sh` handles versioning and uploading.

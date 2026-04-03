@@ -1,7 +1,15 @@
 /**
- * OOJS schema loader and registry.
+ * OOJS schema loader and registry — Node.js edition.
+ *
+ * Identical to the browser implementation except that `loadFile` detects
+ * whether the argument is a URL (http/https) or a file-system path and
+ * reads accordingly.  URLs use `fetch()` (Node 18+); paths use
+ * `node:fs/promises`.
+ *
  * @module registry
  */
+
+import { readFile } from 'node:fs/promises';
 
 import {
   PRIMITIVE_TYPES,
@@ -60,18 +68,30 @@ export class Registry {
   // ------------------------------------------------------------------
 
   /**
-   * Fetch a schema from a URL and load it.
+   * Load a schema from a URL or file path.
+   * - HTTP(S) URLs use `fetch()` (Node 18+)
+   * - File paths use `node:fs/promises`
    * Returns a Promise that resolves to the Schema.
-   * @param {string} url
+   * @param {string} urlOrPath
    * @returns {Promise<Schema>}
    */
-  async loadFile(url) {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new SchemaError(`${url}: HTTP ${response.status} ${response.statusText}`);
+  async loadFile(urlOrPath) {
+    const isUrl = /^https?:\/\//i.test(urlOrPath);
+    let text;
+    if (isUrl) {
+      const response = await fetch(urlOrPath);
+      if (!response.ok) {
+        throw new SchemaError(`${urlOrPath}: HTTP ${response.status} ${response.statusText}`);
+      }
+      text = await response.text();
+    } else {
+      try {
+        text = await readFile(urlOrPath, 'utf8');
+      } catch (e) {
+        throw new SchemaError(`${urlOrPath}: ${e.message}`);
+      }
     }
-    const text = await response.text();
-    return this.loadJson(text, url);
+    return this.loadJson(text, urlOrPath);
   }
 
   /**
@@ -201,7 +221,6 @@ export class Registry {
     this._resolveHierarchy(schema, source);
 
     // Pass 3: eagerly resolve TypeRef property type names to TypeDef objects.
-    // Broken references are caught at load time, not deferred to validation (§A.3).
     this._resolvePropertyTypeRefs(schema, source);
 
     // Check required entries reference own properties only
@@ -348,7 +367,6 @@ export class Registry {
 
     if (kind === 'array') return this._parseArrayProperty(propName, data, typeName, source);
     if (PRIMITIVE_TYPES.has(kind)) return this._parsePrimitiveProperty(propName, data, typeName, source);
-    // Type reference
     return new TypeRefProperty({ typeName: kind, title: data.title ?? '', description: data.description ?? '' });
   }
 
@@ -531,7 +549,6 @@ export class Registry {
     } else if (prop instanceof ArrayProperty) {
       this._resolvePropertyTypeRef(prop.items, schema, source, `${context}.items`);
     }
-    // PrimitiveProperty has no type references to resolve
   }
 
   // ------------------------------------------------------------------
@@ -545,7 +562,6 @@ export class Registry {
       }
     }
 
-    // Cycle detection
     for (const [typeName, typedef] of Object.entries(schema.types)) {
       const visited = new Set();
       let current = typedef;

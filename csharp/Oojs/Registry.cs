@@ -331,12 +331,27 @@ public sealed class Registry
                 $"{source}: property '{propName}' in type '{typeName}' must be a JSON object"
             );
         }
-        if (!data.TryGetProperty("type", out var typeEl))
+        var hasType    = data.TryGetProperty("type", out var typeEl);
+        var hasRefType = data.TryGetProperty("refType", out var refTypeEl);
+
+        if (hasType && hasRefType)
         {
             throw new SchemaError(
-                $"{source}: property '{propName}' in type '{typeName}' missing 'type'"
+                $"{source}: property '{propName}' in type '{typeName}' must not have both 'type' and 'refType'"
             );
         }
+        if (!hasType && !hasRefType)
+        {
+            throw new SchemaError(
+                $"{source}: property '{propName}' in type '{typeName}' missing 'type' or 'refType'"
+            );
+        }
+
+        if (hasRefType)
+        {
+            return ParseIdRefProperty(propName, data, refTypeEl, typeName, source);
+        }
+
         if (typeEl.ValueKind != JsonValueKind.String)
         {
             throw new SchemaError(
@@ -363,6 +378,52 @@ public sealed class Registry
                 ? descEl.GetString() ?? string.Empty
                 : string.Empty,
         };
+    }
+
+    private IdRefProperty ParseIdRefProperty(
+        string propName,
+        JsonElement data,
+        JsonElement refTypeEl,
+        string typeName,
+        string source)
+    {
+        if (refTypeEl.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(refTypeEl.GetString()))
+        {
+            throw new SchemaError(
+                $"{source}: property '{propName}' in type '{typeName}' 'refType' must be a non-empty string"
+            );
+        }
+        var prop = new IdRefProperty(refTypeEl.GetString()!)
+        {
+            Title = data.TryGetProperty("title", out var titleEl) && titleEl.ValueKind == JsonValueKind.String
+                ? titleEl.GetString() ?? string.Empty
+                : string.Empty,
+            Description = data.TryGetProperty("description", out var descEl) && descEl.ValueKind == JsonValueKind.String
+                ? descEl.GetString() ?? string.Empty
+                : string.Empty,
+        };
+
+        int? IntGeZero(string key)
+        {
+            if (!data.TryGetProperty(key, out var el)) return null;
+            if (el.ValueKind != JsonValueKind.Number || !el.TryGetInt32(out var n) || n < 0)
+                throw new SchemaError($"{source}: '{key}' on property '{propName}' in '{typeName}' must be a non-negative integer");
+            return n;
+        }
+
+        prop.MinLength = IntGeZero("minLength");
+        prop.MaxLength = IntGeZero("maxLength");
+        if (prop.MinLength is not null && prop.MaxLength is not null && prop.MinLength > prop.MaxLength)
+            throw new SchemaError($"{source}: 'minLength' > 'maxLength' on '{propName}' in '{typeName}'");
+
+        if (data.TryGetProperty("pattern", out var patEl))
+        {
+            if (patEl.ValueKind != JsonValueKind.String)
+                throw new SchemaError($"{source}: 'pattern' on '{propName}' must be a string");
+            prop.Pattern = patEl.GetString();
+        }
+
+        return prop;
     }
 
     private PrimitiveProperty ParsePrimitiveProperty(
@@ -628,6 +689,10 @@ public sealed class Registry
         if (prop is TypeRefProperty trp)
         {
             trp.ResolvedType = ResolveTypeRef(trp.TypeName, schema, source, context);
+        }
+        else if (prop is IdRefProperty irp)
+        {
+            irp.ResolvedType = ResolveTypeRef(irp.TypeName, schema, source, context);
         }
         else if (prop is ArrayProperty ap)
         {

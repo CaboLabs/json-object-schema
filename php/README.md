@@ -321,3 +321,21 @@ The integration tests (`ClinicalExampleTest`) read directly from `../examples/` 
 - **Regex patterns:** `preg_match('~pattern~u', $value)` with the `u` flag for Unicode mode. The `~` delimiter avoids the need to escape `/` in patterns. Invalid patterns yield `PATTERN_MISMATCH` rather than a fatal error.
 - **`multipleOf` precision:** `round(fmod(abs($num), $divisor), 10)` mirrors the Python `round(num % m, 10)` approach to avoid floating-point false positives.
 - **Function autoloading:** PHP's class autoloader does not cover functions. The `validate()` convenience function lives in `src/Validator.php` and is always loaded via the `"files"` entry in `composer.json`.
+
+## Publishing (`oojs/oojs` on Packagist)
+
+Packagist is updated automatically when a git tag is pushed to the repository.
+
+```bash
+# From the repo root — tag and push triggers Packagist webhook
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+To add as a dependency in another PHP project:
+
+```bash
+composer require oojs/oojs
+```
+
+The automated script `scripts/publish.sh --version <semver>` tags and pushes as part of a coordinated multi-package release.

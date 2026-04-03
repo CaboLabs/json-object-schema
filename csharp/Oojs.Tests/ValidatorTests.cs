@@ -960,3 +960,212 @@ public sealed class ValidatorTests
         Assert.Contains(errs, e => e.Code == ErrorCode.TYPE_MISMATCH && e.Message.Contains("got array"));
     }
 }
+
+public sealed class IdRefPropertyTests
+{
+    private static Dictionary<string, object?> IdRefSchemaDict() => new()
+    {
+        ["$oojs"] = "1.0",
+        ["$id"] = "https://example.org/schemas/idref",
+        ["discriminator"] = "_type",
+        ["types"] = new Dictionary<string, object?>
+        {
+            ["Department"] = new Dictionary<string, object?>
+            {
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["deptId"] = new Dictionary<string, object?> { ["type"] = "string", ["minLength"] = 1 },
+                    ["name"]   = new Dictionary<string, object?> { ["type"] = "string", ["minLength"] = 1 },
+                },
+                ["required"] = new List<object?> { "deptId", "name" },
+            },
+            ["Project"] = new Dictionary<string, object?>
+            {
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["projectId"] = new Dictionary<string, object?> { ["type"] = "string", ["minLength"] = 1 },
+                    ["title"]     = new Dictionary<string, object?> { ["type"] = "string", ["minLength"] = 1 },
+                },
+                ["required"] = new List<object?> { "projectId", "title" },
+            },
+            ["Employee"] = new Dictionary<string, object?>
+            {
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["employeeId"] = new Dictionary<string, object?> { ["type"] = "string", ["minLength"] = 1 },
+                    ["name"]       = new Dictionary<string, object?> { ["type"] = "string", ["minLength"] = 1 },
+                    ["department"] = new Dictionary<string, object?> { ["refType"] = "Department", ["minLength"] = 1 },
+                    ["projects"]   = new Dictionary<string, object?>
+                    {
+                        ["type"] = "array",
+                        ["items"] = new Dictionary<string, object?> { ["refType"] = "Project" },
+                    },
+                },
+                ["required"] = new List<object?> { "employeeId", "name", "department" },
+            },
+        },
+    };
+
+    [Fact]
+    public void ValidStringIdAccepted()
+    {
+        var r = new Registry();
+        var schema = r.LoadDict(IdRefSchemaDict());
+        var emp = new Dictionary<string, object?>
+            { ["_type"] = "Employee", ["employeeId"] = "e-1", ["name"] = "Alice", ["department"] = "dept-eng" };
+        Assert.Empty(ValidatorUtil.Validate(emp, schema.Types["Employee"], schema, r));
+    }
+
+    [Fact]
+    public void IntegerValueRejected()
+    {
+        var r = new Registry();
+        var schema = r.LoadDict(IdRefSchemaDict());
+        var emp = new Dictionary<string, object?>
+            { ["_type"] = "Employee", ["employeeId"] = "e-2", ["name"] = "Bob", ["department"] = 42L };
+        var errs = ValidatorUtil.Validate(emp, schema.Types["Employee"], schema, r);
+        Assert.Contains(errs, e => e.Code == ErrorCode.TYPE_MISMATCH);
+    }
+
+    [Fact]
+    public void ObjectValueRejected()
+    {
+        var r = new Registry();
+        var schema = r.LoadDict(IdRefSchemaDict());
+        var emp = new Dictionary<string, object?>
+        {
+            ["_type"] = "Employee", ["employeeId"] = "e-3", ["name"] = "Carol",
+            ["department"] = new Dictionary<string, object?>
+                { ["_type"] = "Department", ["deptId"] = "d-1", ["name"] = "Eng" },
+        };
+        var errs = ValidatorUtil.Validate(emp, schema.Types["Employee"], schema, r);
+        Assert.Contains(errs, e => e.Code == ErrorCode.TYPE_MISMATCH);
+    }
+
+    [Fact]
+    public void MinLengthEnforced()
+    {
+        var r = new Registry();
+        var schema = r.LoadDict(IdRefSchemaDict());
+        var emp = new Dictionary<string, object?>
+            { ["_type"] = "Employee", ["employeeId"] = "e-4", ["name"] = "Dave", ["department"] = "" };
+        var errs = ValidatorUtil.Validate(emp, schema.Types["Employee"], schema, r);
+        Assert.Contains(errs, e => e.Code == ErrorCode.STRING_TOO_SHORT);
+    }
+
+    [Fact]
+    public void ArrayOfRefTypeIdsValid()
+    {
+        var r = new Registry();
+        var schema = r.LoadDict(IdRefSchemaDict());
+        var emp = new Dictionary<string, object?>
+        {
+            ["_type"] = "Employee", ["employeeId"] = "e-5", ["name"] = "Eve",
+            ["department"] = "dept-ops",
+            ["projects"] = new List<object?> { "proj-a", "proj-b" },
+        };
+        Assert.Empty(ValidatorUtil.Validate(emp, schema.Types["Employee"], schema, r));
+    }
+
+    [Fact]
+    public void ArrayItemNotStringRejected()
+    {
+        var r = new Registry();
+        var schema = r.LoadDict(IdRefSchemaDict());
+        var emp = new Dictionary<string, object?>
+        {
+            ["_type"] = "Employee", ["employeeId"] = "e-6", ["name"] = "Frank",
+            ["department"] = "dept-ops",
+            ["projects"] = new List<object?> { "proj-a", 99L },
+        };
+        var errs = ValidatorUtil.Validate(emp, schema.Types["Employee"], schema, r);
+        Assert.Contains(errs, e => e.Code == ErrorCode.TYPE_MISMATCH);
+    }
+
+    [Fact]
+    public void UnknownRefTypeCausesSchemaError()
+    {
+        var r = new Registry();
+        Assert.Throws<SchemaError>(() => r.LoadDict(new Dictionary<string, object?>
+        {
+            ["$oojs"] = "1.0",
+            ["$id"] = "https://example.org/schemas/bad",
+            ["types"] = new Dictionary<string, object?>
+            {
+                ["Foo"] = new Dictionary<string, object?>
+                {
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["bar"] = new Dictionary<string, object?> { ["refType"] = "NonExistent" },
+                    },
+                },
+            },
+        }));
+    }
+
+    [Fact]
+    public void BothTypeAndRefTypeCausesSchemaError()
+    {
+        var r = new Registry();
+        Assert.Throws<SchemaError>(() => r.LoadDict(new Dictionary<string, object?>
+        {
+            ["$oojs"] = "1.0",
+            ["$id"] = "https://example.org/schemas/both",
+            ["types"] = new Dictionary<string, object?>
+            {
+                ["Target"] = new Dictionary<string, object?>
+                {
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["x"] = new Dictionary<string, object?> { ["type"] = "string" },
+                    },
+                },
+                ["Src"] = new Dictionary<string, object?>
+                {
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["prop"] = new Dictionary<string, object?> { ["type"] = "Target", ["refType"] = "Target" },
+                    },
+                },
+            },
+        }));
+    }
+
+    [Fact]
+    public void PatternConstraintEnforced()
+    {
+        var r = new Registry();
+        var schema = r.LoadDict(new Dictionary<string, object?>
+        {
+            ["$oojs"] = "1.0",
+            ["$id"] = "https://example.org/schemas/idref-pattern",
+            ["types"] = new Dictionary<string, object?>
+            {
+                ["Target"] = new Dictionary<string, object?>
+                {
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["targetId"] = new Dictionary<string, object?> { ["type"] = "string" },
+                    },
+                    ["required"] = new List<object?> { "targetId" },
+                },
+                ["Source"] = new Dictionary<string, object?>
+                {
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["targetRef"] = new Dictionary<string, object?>
+                            { ["refType"] = "Target", ["pattern"] = "^[a-z]+-[0-9]+$" },
+                    },
+                    ["required"] = new List<object?> { "targetRef" },
+                },
+            },
+        });
+
+        var good = new Dictionary<string, object?> { ["_type"] = "Source", ["targetRef"] = "item-42" };
+        Assert.Empty(ValidatorUtil.Validate(good, schema.Types["Source"], schema, r));
+
+        var bad = new Dictionary<string, object?> { ["_type"] = "Source", ["targetRef"] = "ITEM42" };
+        var errs = ValidatorUtil.Validate(bad, schema.Types["Source"], schema, r);
+        Assert.Contains(errs, e => e.Code == ErrorCode.PATTERN_MISMATCH);
+    }
+}

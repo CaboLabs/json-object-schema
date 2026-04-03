@@ -53,19 +53,44 @@ console.log(errors); // []
 | Command | Description |
 |---------|-------------|
 | `npm run build` | Compile `src/` → `dist/` (ES2022 modules) |
+| `npm run build:browser` | Build browser bundle `dist/oojs.browser.js` (esbuild) |
+| `npm run build:all` | Both of the above |
 | `npm test` | Run the test suite once with Vitest |
 | `npm run test:watch` | Run tests in watch mode |
 
-## Using the Compiled Output in a Browser
+## Using the Compiled Output
 
-After `npm run build`, the `dist/` folder contains ES2022 modules that can be imported directly:
+**Node.js / bundler** — use the compiled modules in `dist/`:
+```typescript
+import { Registry, validate } from '@oojs/core';
+```
 
+**Browser (no bundler)** — use the pre-bundled ESM file after `npm run build:browser`:
 ```html
 <script type="module">
-  import { Registry, validate } from './dist/index.js';
-  // ...
+  import { Registry, validate } from './dist/oojs.browser.js';
 </script>
 ```
+
+**Direct TypeScript** — import from `src/` with `moduleResolution: bundler`:
+```typescript
+import { Registry, validate } from './src/index.js';
+```
+
+## Building and Publishing (`@oojs/core`)
+
+```sh
+cd ts/
+npm install
+
+# Build everything (Node modules + browser bundle)
+npm run build:all
+
+# Publish to npm (requires npm login)
+npm publish --access public
+```
+
+The `prepublishOnly` hook runs `build` automatically on `npm publish`.
 
 ## API
 
@@ -169,4 +194,5 @@ Expected output:
 
 - `abstract` and `extends` are reserved keywords in TypeScript. The model uses `isAbstract` and `extendsRef` instead — the schema JSON still uses `"abstract"` and `"extends"` as keys; the renaming is internal only.
 - `ErrorCode` is typed as `const` so `ErrorCode.MISSING_DISCRIMINATOR` has the precise literal type `"MISSING_DISCRIMINATOR"`.
-- The `PropertyDef` union type (`PrimitiveProperty | TypeRefProperty | ArrayProperty`) is exported for consumers who need to switch on property kinds.
+- The `PropertyDef` union type (`PrimitiveProperty | IdRefProperty | TypeRefProperty | ArrayProperty`) is exported for consumers who need to switch on property kinds.
+- `Registry.loadFile()` detects whether the argument is an HTTP(S) URL or a file-system path. URLs use `fetch()`, file paths use `node:fs/promises` (Node.js only via dynamic import).

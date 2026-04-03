@@ -133,6 +133,10 @@ public sealed class Validator
         {
             return ValidatePrimitive(value, prim, path, errors);
         }
+        if (prop is IdRefProperty idRef)
+        {
+            return ValidateIdRef(value, idRef, path, errors);
+        }
         if (prop is TypeRefProperty typeRef)
         {
             return ValidateTypeRef(value, typeRef, schema, path, errors);
@@ -342,6 +346,56 @@ public sealed class Validator
             }
         }
 
+        return true;
+    }
+
+    private bool ValidateIdRef(object? value, IdRefProperty prop, string path, List<ValidationError> errors)
+    {
+        if (value is not string strVal)
+        {
+            errors.Add(new ValidationError(path, ErrorCode.TYPE_MISMATCH,
+                $"expected a string id for refType '{prop.TypeName}', got {JsonTypeName(value)}"));
+            return !_failFast;
+        }
+
+        // Count Unicode code points
+        var length = System.Globalization.StringInfo.GetTextElementEnumerator(strVal);
+        int charCount = 0;
+        while (length.MoveNext()) charCount++;
+
+        if (prop.MinLength is not null && charCount < prop.MinLength)
+        {
+            errors.Add(new ValidationError(path, ErrorCode.STRING_TOO_SHORT,
+                $"string length {charCount} < minLength {prop.MinLength}"));
+            if (_failFast) return false;
+        }
+        if (prop.MaxLength is not null && charCount > prop.MaxLength)
+        {
+            errors.Add(new ValidationError(path, ErrorCode.STRING_TOO_LONG,
+                $"string length {charCount} > maxLength {prop.MaxLength}"));
+            if (_failFast) return false;
+        }
+        if (prop.Pattern is not null)
+        {
+            bool matched;
+            try
+            {
+                matched = System.Text.RegularExpressions.Regex.IsMatch(strVal, prop.Pattern);
+            }
+            catch (System.Text.RegularExpressions.RegexParseException ex)
+            {
+                errors.Add(new ValidationError(path, ErrorCode.PATTERN_MISMATCH,
+                    $"invalid pattern '{prop.Pattern}': {ex.Message}"));
+                if (_failFast) return false;
+                matched = true;
+            }
+            if (!matched)
+            {
+                errors.Add(new ValidationError(path, ErrorCode.PATTERN_MISMATCH,
+                    $"value does not match pattern '{prop.Pattern}'"));
+                if (_failFast) return false;
+            }
+        }
         return true;
     }
 

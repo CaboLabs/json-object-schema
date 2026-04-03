@@ -2,7 +2,7 @@
  * OOJS instance validator (§9 of the spec).
  */
 
-import { ArrayProperty, PrimitiveProperty, TypeRefProperty, TypeDef, Schema } from './model.js';
+import { ArrayProperty, IdRefProperty, PrimitiveProperty, TypeRefProperty, TypeDef, Schema } from './model.js';
 import { Registry } from './registry.js';
 
 // ---------------------------------------------------------------------------
@@ -213,13 +213,14 @@ export class Validator {
 
   private _validateProperty(
     value: unknown,
-    prop: ArrayProperty | PrimitiveProperty | TypeRefProperty,
+    prop: ArrayProperty | IdRefProperty | PrimitiveProperty | TypeRefProperty,
     schema: Schema,
     path: string,
     errors: ValidationError[],
   ): boolean {
     if (prop instanceof ArrayProperty) return this._validateArray(value, prop, schema, path, errors);
     if (prop instanceof PrimitiveProperty) return this._validatePrimitive(value, prop, path, errors);
+    if (prop instanceof IdRefProperty) return this._validateIdRef(value, prop, path, errors);
     if (prop instanceof TypeRefProperty) return this._validateTypeRef(value, prop, schema, path, errors);
     return true;
   }
@@ -356,6 +357,43 @@ export class Validator {
       }
     }
 
+    return true;
+  }
+
+  private _validateIdRef(value: unknown, prop: IdRefProperty, path: string, errors: ValidationError[]): boolean {
+    if (typeof value !== 'string') {
+      errors.push(new ValidationError(path, ErrorCode.TYPE_MISMATCH,
+        `expected a string id for refType '${prop.typeName}', got ${jsonTypeName(value)}`));
+      return !this._failFast;
+    }
+
+    const length = [...value].length;
+    if (prop.minLength != null && length < prop.minLength) {
+      errors.push(new ValidationError(path, ErrorCode.STRING_TOO_SHORT,
+        `string length ${length} < minLength ${prop.minLength}`));
+      if (this._failFast) return false;
+    }
+    if (prop.maxLength != null && length > prop.maxLength) {
+      errors.push(new ValidationError(path, ErrorCode.STRING_TOO_LONG,
+        `string length ${length} > maxLength ${prop.maxLength}`));
+      if (this._failFast) return false;
+    }
+    if (prop.pattern != null) {
+      let matched: boolean;
+      try {
+        matched = new RegExp(prop.pattern, 'u').test(value);
+      } catch (e: unknown) {
+        errors.push(new ValidationError(path, ErrorCode.PATTERN_MISMATCH,
+          `invalid pattern '${prop.pattern}': ${(e as Error).message}`));
+        if (this._failFast) return false;
+        matched = true;
+      }
+      if (!matched) {
+        errors.push(new ValidationError(path, ErrorCode.PATTERN_MISMATCH,
+          `value does not match pattern '${prop.pattern}'`));
+        if (this._failFast) return false;
+      }
+    }
     return true;
   }
 

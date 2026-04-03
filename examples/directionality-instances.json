@@ -11,27 +11,27 @@
       "email":      "billing@acme.example"
     },
     {
-      "_comment":   "Domain 1 — Unidirectional. Invoice SOURCE → Customer TARGET. Navigation is one-way: Invoice → Customer only.",
+      "_comment":   "Domain 1 — Unidirectional. Invoice SOURCE → Customer TARGET. Navigation is one-way: Invoice → Customer only. customer is the Customer's ID string.",
       "_type":      "Invoice",
       "invoiceId":  "inv-001",
       "amount":     1250.00,
       "dueDate":    "2026-04-30",
-      "customerId": "cust-001"
+      "customer":   "cust-001"
     },
     {
       "_comment":   "Domain 1 — Unidirectional. A second Invoice referencing the same Customer. The Customer object never changes; only the Invoice side holds the link.",
       "_type":      "Invoice",
       "invoiceId":  "inv-002",
       "amount":     340.50,
-      "customerId": "cust-001"
+      "customer":   "cust-001"
     },
 
     {
-      "_comment":   "Domain 2 — Bidirectional horizontal. Person: INVERSE side. carIds lists cars Alice owns. Must be kept in sync with Car.ownerId by the application.",
+      "_comment":   "Domain 2 — Bidirectional horizontal. Person: INVERSE side. cars lists IDs of cars Alice owns. Must be kept in sync with Car.owner by the application.",
       "_type":      "Person",
       "personId":   "person-001",
       "name":       "Alice",
-      "carIds":     ["car-001", "car-002"]
+      "cars":       ["car-001", "car-002"]
     },
     {
       "_comment":   "Domain 2 — Bidirectional horizontal. Car: OWNING side. car-001 belongs to Alice. Both sides agree — consistent bidirectional state.",
@@ -39,7 +39,7 @@
       "carId":      "car-001",
       "make":       "Acme",
       "model":      "Roadster",
-      "ownerId":    "person-001"
+      "owner":      "person-001"
     },
     {
       "_comment":   "Domain 2 — Bidirectional horizontal. Car: OWNING side. car-002 also belongs to Alice. Both sides agree — consistent bidirectional state.",
@@ -47,17 +47,17 @@
       "carId":      "car-002",
       "make":       "ZipCar",
       "model":      "Nano",
-      "ownerId":    "person-001"
+      "owner":      "person-001"
     },
     {
-      "_comment":   "Domain 2 — Bidirectional horizontal. Person with no cars yet. The optional carIds array may be omitted.",
+      "_comment":   "Domain 2 — Bidirectional horizontal. Person with no cars yet. The optional cars array may be omitted.",
       "_type":      "Person",
       "personId":   "person-002",
       "name":       "Bob"
     },
 
     {
-      "_comment":   "Domain 3 — Mixed vertical+horizontal bidirectional. Report embeds Sections (vertical has-many). Each Section carries a reportId back-reference enabling Section → Report navigation without parsing the full Report.",
+      "_comment":   "Domain 3 — Mixed vertical+horizontal bidirectional. Report embeds Sections (vertical has-many). Each Section carries a report back-reference enabling Section → Report navigation without parsing the full Report.",
       "_type":      "Report",
       "reportId":   "rpt-001",
       "title":      "Annual Safety Review",
@@ -67,20 +67,20 @@
           "sectionId": "sec-001",
           "title":     "Introduction",
           "body":      "This report covers safety metrics for 2025.",
-          "reportId":  "rpt-001"
+          "report":    "rpt-001"
         },
         {
           "_type":     "Section",
           "sectionId": "sec-002",
           "title":     "Findings",
           "body":      "No critical issues were identified.",
-          "reportId":  "rpt-001"
+          "report":    "rpt-001"
         },
         {
           "_type":     "Section",
           "sectionId": "sec-003",
           "title":     "Recommendations",
-          "reportId":  "rpt-001"
+          "report":    "rpt-001"
         }
       ]
     }
@@ -90,23 +90,31 @@
   "invalid": [
 
     {
-      "_comment":   "Domain 1 — ERROR: Invoice missing required customerId. Removing the only directional link violates the schema.",
+      "_comment":   "Domain 1 — ERROR: Invoice missing required customer reference. Removing the only directional link violates the schema.",
       "_type":      "Invoice",
       "invoiceId":  "inv-bad-001",
       "amount":     99.00
     },
     {
-      "_comment":   "Domain 2 — ERROR: Car missing required ownerId. The owning side of the bidirectional relationship is declared required.",
+      "_comment":   "Domain 2 — ERROR: Car missing required owner. The owning side of the bidirectional relationship is declared required.",
       "_type":      "Car",
       "carId":      "car-bad-001",
       "make":       "Acme",
       "model":      "NoOwner"
     },
     {
-      "_comment":   "Domain 3 — ERROR: Section missing required reportId back-reference.",
+      "_comment":   "Domain 3 — ERROR: Section missing required report back-reference.",
       "_type":      "Section",
       "sectionId":  "sec-bad-001",
       "title":      "Detached Section"
+    },
+
+    {
+      "_comment":   "Domain 1 — ERROR: customer must be a string ID, not an embedded Customer object.",
+      "_type":      "Invoice",
+      "invoiceId":  "inv-bad-002",
+      "amount":     50.00,
+      "customer":   { "_type": "Customer", "customerId": "cust-1", "name": "Embedded" }
     },
 
     {
@@ -114,18 +122,18 @@
       "_type":      "Person",
       "personId":   "person-003",
       "name":       "Charlie",
-      "carIds":     ["car-003"]
+      "cars":       ["car-003"]
     },
     {
-      "_comment":   "Domain 2 — INDIVIDUALLY VALID but INCONSISTENT: Car.ownerId is person-004 but person-003 above listed this car. This inconsistency is invisible to OOJS.",
+      "_comment":   "Domain 2 — INDIVIDUALLY VALID but INCONSISTENT: Car.owner is person-004 but person-003 above listed this car. This inconsistency is invisible to OOJS.",
       "_type":      "Car",
       "carId":      "car-003",
       "make":       "Generic",
       "model":      "Sedan",
-      "ownerId":    "person-004"
+      "owner":      "person-004"
     },
     {
-      "_comment":   "Domain 3 — INDIVIDUALLY VALID but INCONSISTENT: Section.reportId does not match the enclosing Report's reportId. OOJS validates the Report without error — the back-reference mismatch is invisible to the validator.",
+      "_comment":   "Domain 3 — INDIVIDUALLY VALID but INCONSISTENT: Section.report does not match the enclosing Report's reportId. OOJS validates the Report without error — the back-reference mismatch is invisible to the validator.",
       "_type":      "Report",
       "reportId":   "rpt-002",
       "title":      "Mismatched Back-Reference",
@@ -134,7 +142,7 @@
           "_type":     "Section",
           "sectionId": "sec-099",
           "title":     "Orphaned Section",
-          "reportId":  "rpt-WRONG"
+          "report":    "rpt-WRONG"
         }
       ]
     }

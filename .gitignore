@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Node
+node_modules/
+ts/dist/
+
+# Java/Gradle
+java/build/
+java/.gradle/
+*.class
+
+# C#
+csharp/*/bin/
+csharp/*/obj/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store

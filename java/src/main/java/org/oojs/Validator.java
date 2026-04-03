@@ -218,6 +218,7 @@ public class Validator {
             String path, List<ValidationError> errors) {
         if (prop instanceof ArrayProperty) return validateArray(value, (ArrayProperty) prop, schema, path, errors);
         if (prop instanceof PrimitiveProperty) return validatePrimitive(value, (PrimitiveProperty) prop, path, errors);
+        if (prop instanceof IdRefProperty) return validateIdRef(value, (IdRefProperty) prop, path, errors);
         if (prop instanceof TypeRefProperty) return validateTypeRef(value, (TypeRefProperty) prop, schema, path, errors);
         return true;
     }
@@ -351,6 +352,45 @@ public class Validator {
                             "value " + value + " not in enum " + prop.enumValues));
                     if (failFast) return false;
                 }
+            }
+        }
+        return true;
+    }
+
+    // -- Id reference (§9.2 Phase 4, id-ref branch) ----------------------
+
+    private boolean validateIdRef(Object value, IdRefProperty prop, String path, List<ValidationError> errors) {
+        if (!(value instanceof String)) {
+            errors.add(new ValidationError(path, ErrorCode.TYPE_MISMATCH,
+                    "expected a string id for refType '" + prop.typeName + "', got " + jsonTypeName(value)));
+            return !failFast;
+        }
+        String s = (String) value;
+        int length = s.codePointCount(0, s.length());
+        if (prop.minLength != null && length < prop.minLength) {
+            errors.add(new ValidationError(path, ErrorCode.STRING_TOO_SHORT,
+                    "string length " + length + " < minLength " + prop.minLength));
+            if (failFast) return false;
+        }
+        if (prop.maxLength != null && length > prop.maxLength) {
+            errors.add(new ValidationError(path, ErrorCode.STRING_TOO_LONG,
+                    "string length " + length + " > maxLength " + prop.maxLength));
+            if (failFast) return false;
+        }
+        if (prop.pattern != null) {
+            boolean matched;
+            try {
+                matched = Pattern.compile(prop.pattern).matcher(s).find();
+            } catch (PatternSyntaxException e) {
+                errors.add(new ValidationError(path, ErrorCode.PATTERN_MISMATCH,
+                        "invalid pattern '" + prop.pattern + "': " + e.getMessage()));
+                if (failFast) return false;
+                matched = true;
+            }
+            if (!matched) {
+                errors.add(new ValidationError(path, ErrorCode.PATTERN_MISMATCH,
+                        "value does not match pattern '" + prop.pattern + "'"));
+                if (failFast) return false;
             }
         }
         return true;

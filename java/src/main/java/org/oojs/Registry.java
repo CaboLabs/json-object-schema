@@ -280,9 +280,20 @@ public class Registry {
 
     @SuppressWarnings("unchecked")
     private PropertyDef parseProperty(String propName, Map<String, Object> data, String typeName, String source) {
-        if (!data.containsKey("type")) {
-            throw new SchemaError(source + ": property '" + propName + "' in type '" + typeName + "' missing 'type'");
+        boolean hasType    = data.containsKey("type");
+        boolean hasRefType = data.containsKey("refType");
+
+        if (hasType && hasRefType) {
+            throw new SchemaError(source + ": property '" + propName + "' in type '" + typeName
+                    + "' must not have both 'type' and 'refType'");
         }
+        if (!hasType && !hasRefType) {
+            throw new SchemaError(source + ": property '" + propName + "' in type '" + typeName
+                    + "' missing 'type' or 'refType'");
+        }
+
+        if (hasRefType) return parseIdRefProperty(propName, data, typeName, source);
+
         Object kindObj = data.get("type");
         if (!(kindObj instanceof String)) {
             throw new SchemaError(source + ": property '" + propName + "' in type '" + typeName + "' 'type' must be a string");
@@ -294,6 +305,30 @@ public class Registry {
         return new TypeRefProperty(kind,
                 data.getOrDefault("title", "").toString(),
                 data.getOrDefault("description", "").toString());
+    }
+
+    private IdRefProperty parseIdRefProperty(String propName, Map<String, Object> data,
+            String typeName, String source) {
+        Object rtObj = data.get("refType");
+        if (!(rtObj instanceof String) || ((String) rtObj).trim().isEmpty()) {
+            throw new SchemaError(source + ": property '" + propName + "' in type '" + typeName
+                    + "' 'refType' must be a non-empty string");
+        }
+        IdRefProperty prop = new IdRefProperty((String) rtObj);
+        prop.title       = data.getOrDefault("title", "").toString();
+        prop.description = data.getOrDefault("description", "").toString();
+        prop.minLength   = readNonNegInt(data, "minLength", propName, typeName, source);
+        prop.maxLength   = readNonNegInt(data, "maxLength", propName, typeName, source);
+        if (prop.minLength != null && prop.maxLength != null && prop.minLength > prop.maxLength) {
+            throw new SchemaError(source + ": 'minLength' > 'maxLength' on '" + propName + "' in '" + typeName + "'");
+        }
+        Object patObj = data.get("pattern");
+        if (patObj != null) {
+            if (!(patObj instanceof String))
+                throw new SchemaError(source + ": 'pattern' on '" + propName + "' must be a string");
+            prop.pattern = (String) patObj;
+        }
+        return prop;
     }
 
     private PrimitiveProperty parsePrimitiveProperty(String propName, Map<String, Object> data,
@@ -404,6 +439,9 @@ public class Registry {
         if (prop instanceof TypeRefProperty) {
             TypeRefProperty trp = (TypeRefProperty) prop;
             trp.resolvedType = resolveTypeRef(trp.typeName, schema, source, context);
+        } else if (prop instanceof IdRefProperty) {
+            IdRefProperty irp = (IdRefProperty) prop;
+            irp.resolvedType = resolveTypeRef(irp.typeName, schema, source, context);
         } else if (prop instanceof ArrayProperty) {
             resolvePropertyTypeRef(((ArrayProperty) prop).items, schema, source, context + ".items");
         }

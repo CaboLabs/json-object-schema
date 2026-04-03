@@ -41,8 +41,19 @@ class TypeRefProperty:
 
 
 @dataclass
+class IdRefProperty:
+    type_name: str          # "TypeName" or "alias.TypeName"
+    title: str = ""
+    description: str = ""
+    min_length: int | None = None
+    max_length: int | None = None
+    pattern: str | None = None
+    resolved_type: "TypeDef | None" = field(default=None, repr=False)  # populated at load time
+
+
+@dataclass
 class ArrayProperty:
-    items: PrimitiveProperty | TypeRefProperty = None  # type: ignore[assignment]
+    items: "PrimitiveProperty | TypeRefProperty | IdRefProperty" = None  # type: ignore[assignment]
     min_items: int = 0
     max_items: int | None = None
     unique_items: bool = False
@@ -50,7 +61,7 @@ class ArrayProperty:
     description: str = ""
 
 
-PropertyDef = PrimitiveProperty | TypeRefProperty | ArrayProperty
+PropertyDef = PrimitiveProperty | TypeRefProperty | IdRefProperty | ArrayProperty
 
 
 # ---------------------------------------------------------------------------

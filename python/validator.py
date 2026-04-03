@@ -20,6 +20,7 @@ from .loader import Registry
 from .model import (
     PRIMITIVE_TYPES,
     ArrayProperty,
+    IdRefProperty,
     PrimitiveProperty,
     Schema,
     TypeDef,
@@ -218,6 +219,8 @@ class Validator:
         path: str,
         errors: ValidationResult,
     ) -> bool:
+        if isinstance(prop, IdRefProperty):
+            return self._validate_id_ref(value, prop, path, errors)
         if isinstance(prop, ArrayProperty):
             return self._validate_array(value, prop, schema, path, errors)
         if isinstance(prop, PrimitiveProperty):
@@ -406,6 +409,46 @@ class Validator:
                 if self._fail_fast:
                     return False
 
+        return True
+
+    # -- Id reference (§9.2 Phase 4, id-ref branch) ----------------------
+
+    def _validate_id_ref(
+        self,
+        value: Any,
+        prop: IdRefProperty,
+        path: str,
+        errors: ValidationResult,
+    ) -> bool:
+        if not isinstance(value, str):
+            errors.append(ValidationError(path=path, code=ErrorCode.TYPE_MISMATCH,
+                message="expected a string for id reference"))
+            return not self._fail_fast
+        length = len(value)  # Unicode code points
+        if prop.min_length is not None and length < prop.min_length:
+            errors.append(ValidationError(path=path, code=ErrorCode.STRING_TOO_SHORT,
+                message=f"string length {length} < minLength {prop.min_length}"))
+            if self._fail_fast:
+                return False
+        if prop.max_length is not None and length > prop.max_length:
+            errors.append(ValidationError(path=path, code=ErrorCode.STRING_TOO_LONG,
+                message=f"string length {length} > maxLength {prop.max_length}"))
+            if self._fail_fast:
+                return False
+        if prop.pattern is not None:
+            try:
+                compiled = re.compile(prop.pattern)
+            except re.error as e:
+                errors.append(ValidationError(path=path, code=ErrorCode.PATTERN_MISMATCH,
+                    message=f"invalid pattern '{prop.pattern}': {e}"))
+                if self._fail_fast:
+                    return False
+            else:
+                if not compiled.search(value):
+                    errors.append(ValidationError(path=path, code=ErrorCode.PATTERN_MISMATCH,
+                        message=f"value does not match pattern '{prop.pattern}'"))
+                    if self._fail_fast:
+                        return False
         return True
 
     # -- Type reference (§9.2 Phase 4, type-ref branch) ------------------

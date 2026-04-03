@@ -1,10 +1,15 @@
 /**
  * OOJS schema loader and registry.
+ *
+ * `loadFile` detects whether the argument is an HTTP(S) URL or a file-system
+ * path.  URLs use `fetch()` (Node 18+ / browser); paths use `node:fs/promises`
+ * when available (Node) and fall back to `fetch()` in browsers.
  */
 
 import {
   PRIMITIVE_TYPES,
   ArrayProperty,
+  IdRefProperty,
   PrimitiveProperty,
   PrimitivePropertyParams,
   Schema,
@@ -48,13 +53,25 @@ export class Registry {
   // Loading
   // ------------------------------------------------------------------
 
-  async loadFile(url: string): Promise<Schema> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new SchemaError(`${url}: HTTP ${response.status} ${response.statusText}`);
+  async loadFile(urlOrPath: string): Promise<Schema> {
+    const isUrl = /^https?:\/\//i.test(urlOrPath);
+    let text: string;
+    if (isUrl) {
+      const response = await fetch(urlOrPath);
+      if (!response.ok) {
+        throw new SchemaError(`${urlOrPath}: HTTP ${response.status} ${response.statusText}`);
+      }
+      text = await response.text();
+    } else {
+      // Node.js file path — use dynamic import to stay browser-safe
+      try {
+        const { readFile } = await import('node:fs/promises');
+        text = await readFile(urlOrPath, 'utf8');
+      } catch (e: unknown) {
+        throw new SchemaError(`${urlOrPath}: ${(e as Error).message}`);
+      }
     }
-    const text = await response.text();
-    return this.loadJson(text, url);
+    return this.loadJson(text, urlOrPath);
   }
 
   loadJson(text: string, source = '<string>'): Schema {
@@ -286,11 +303,22 @@ export class Registry {
         `${source}: property '${propName}' in type '${typeName}' must be a JSON object`,
       );
     }
-    if (!Object.prototype.hasOwnProperty.call(data, 'type')) {
+    const hasType    = Object.prototype.hasOwnProperty.call(data, 'type');
+    const hasRefType = Object.prototype.hasOwnProperty.call(data, 'refType');
+
+    if (hasType && hasRefType) {
       throw new SchemaError(
-        `${source}: property '${propName}' in type '${typeName}' missing 'type'`,
+        `${source}: property '${propName}' in type '${typeName}' must not have both 'type' and 'refType'`,
       );
     }
+    if (!hasType && !hasRefType) {
+      throw new SchemaError(
+        `${source}: property '${propName}' in type '${typeName}' missing 'type' or 'refType'`,
+      );
+    }
+
+    if (hasRefType) return this._parseIdRefProperty(propName, data, typeName, source);
+
     const kind = data.type;
     if (typeof kind !== 'string') {
       throw new SchemaError(
@@ -301,6 +329,42 @@ export class Registry {
     if (kind === 'array') return this._parseArrayProperty(propName, data, typeName, source);
     if (PRIMITIVE_TYPES.has(kind)) return this._parsePrimitiveProperty(propName, data, typeName, source);
     return new TypeRefProperty({ typeName: kind, title: (data.title as string) ?? '', description: (data.description as string) ?? '' });
+  }
+
+  private _parseIdRefProperty(propName: string, data: Record<string, unknown>, typeName: string, source: string): IdRefProperty {
+    const refTypeName = data.refType;
+    if (typeof refTypeName !== 'string' || refTypeName.trim() === '') {
+      throw new SchemaError(
+        `${source}: property '${propName}' in type '${typeName}' 'refType' must be a non-empty string`,
+      );
+    }
+    const prop = new IdRefProperty(refTypeName);
+    prop.title = (data.title as string) ?? '';
+    prop.description = (data.description as string) ?? '';
+
+    const intGeZero = (key: string): number | null => {
+      const v = data[key];
+      if (v == null) return null;
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) {
+        throw new SchemaError(
+          `${source}: '${key}' on property '${propName}' in '${typeName}' must be a non-negative integer`,
+        );
+      }
+      return v as number;
+    };
+
+    prop.minLength = intGeZero('minLength');
+    prop.maxLength = intGeZero('maxLength');
+    if (prop.minLength != null && prop.maxLength != null && prop.minLength > prop.maxLength) {
+      throw new SchemaError(`${source}: 'minLength' > 'maxLength' on '${propName}' in '${typeName}'`);
+    }
+    if (data.pattern != null) {
+      if (typeof data.pattern !== 'string') {
+        throw new SchemaError(`${source}: 'pattern' on '${propName}' must be a string`);
+      }
+      prop.pattern = data.pattern;
+    }
+    return prop;
   }
 
   private _parsePrimitiveProperty(propName: string, data: Record<string, unknown>, typeName: string, source: string): PrimitiveProperty {
@@ -440,6 +504,8 @@ export class Registry {
 
   private _resolvePropertyTypeRef(prop: PropertyDef, schema: Schema, source: string, context: string): void {
     if (prop instanceof TypeRefProperty) {
+      prop.resolvedType = this._resolveTypeRef(prop.typeName, schema, source, context);
+    } else if (prop instanceof IdRefProperty) {
       prop.resolvedType = this._resolveTypeRef(prop.typeName, schema, source, context);
     } else if (prop instanceof ArrayProperty) {
       this._resolvePropertyTypeRef(prop.items, schema, source, `${context}.items`);

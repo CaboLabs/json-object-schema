@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   Vertical   | TypeRefProperty      | ArrayProperty{items:TypeRef}
  *   (embedded) | Employee.address     | Employee.badges
  *   -----------+----------------------+-----------------------------
- *   Horizontal | PrimitiveProperty    | ArrayProperty{items:string}
- *   (ID ref)   | Employee.departmentId| Employee.projectIds
+ *   Horizontal | IdRefProperty        | ArrayProperty{items:IdRef}
+ *   (ID ref)   | Employee.department  | Employee.projects
  *
  * Uses the relationships.oojs.json / relationships-instances.json example fixtures.
  */
@@ -90,7 +90,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-001",
                 "name", "Alice",
-                "departmentId", "dept-eng",
+                "department", "dept-eng",
                 "address", map("_type", "Address", "street", "1 Main St", "city", "Springfield"));
 
         assertEquals(List.of(), new Validator(r).validate(emp, schema.types.get("Employee"), schema));
@@ -102,7 +102,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-002",
                 "name", "Bob",
-                "departmentId", "dept-ops");
+                "department", "dept-ops");
 
         assertEquals(List.of(), new Validator(r).validate(emp, schema.types.get("Employee"), schema));
     }
@@ -113,7 +113,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-003",
                 "name", "Carol",
-                "departmentId", "dept-eng",
+                "department", "dept-eng",
                 "address", map("_type", "Address", "city", "Springfield")); // street absent
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
@@ -126,7 +126,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-004",
                 "name", "Dave",
-                "departmentId", "dept-eng",
+                "department", "dept-eng",
                 "address", map("_type", "Badge", "badgeId", "b-1", "label", "X"));
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
@@ -139,7 +139,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-005",
                 "name", "Eve",
-                "departmentId", "dept-eng",
+                "department", "dept-eng",
                 "address", "not-an-object");
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
@@ -156,7 +156,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-010",
                 "name", "Frank",
-                "departmentId", "dept-eng",
+                "department", "dept-eng",
                 "badges", list(
                         map("_type", "Badge", "badgeId", "b-1", "label", "Safety", "level", 3),
                         map("_type", "Badge", "badgeId", "b-2", "label", "Leader")));
@@ -170,7 +170,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-011",
                 "name", "Grace",
-                "departmentId", "dept-hr",
+                "department", "dept-hr",
                 "badges", list());
 
         assertEquals(List.of(), new Validator(r).validate(emp, schema.types.get("Employee"), schema));
@@ -182,7 +182,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-012",
                 "name", "Henry",
-                "departmentId", "dept-eng",
+                "department", "dept-eng",
                 "badges", list(
                         map("_type", "Badge", "badgeId", "b-ok", "label", "OK"),
                         map("_type", "Badge", "badgeId", "b-bad"))); // label absent
@@ -198,7 +198,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-013",
                 "name", "Iris",
-                "departmentId", "dept-eng",
+                "department", "dept-eng",
                 "badges", list(
                         map("_type", "Badge", "badgeId", "b-1", "label", "Expert", "level", 10)));
 
@@ -212,7 +212,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-014",
                 "name", "Jack",
-                "departmentId", "dept-eng",
+                "department", "dept-eng",
                 "badges", map("_type", "Badge", "badgeId", "b-1", "label", "X"));
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
@@ -220,7 +220,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
     }
 
     // ------------------------------------------------------------------
-    // §8.7 — Has-one horizontal (Employee.departmentId → ID string)
+    // §8.7 — Has-one horizontal (Employee.department → Department ID via refType)
     // ------------------------------------------------------------------
 
     @Test
@@ -229,7 +229,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-020",
                 "name", "Karen",
-                "departmentId", "dept-eng");
+                "department", "dept-eng");
 
         assertEquals(List.of(), new Validator(r).validate(emp, schema.types.get("Employee"), schema));
     }
@@ -239,7 +239,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
         Map<String, Object> emp = map(
                 "_type", "Employee",
                 "employeeId", "emp-021",
-                "name", "Leo"); // departmentId absent
+                "name", "Leo"); // department absent
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
         assertTrue(hasCode(errs, ErrorCode.MISSING_REQUIRED));
@@ -251,7 +251,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-022",
                 "name", "Mia",
-                "departmentId", 42);
+                "department", 42);
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
         assertTrue(hasCode(errs, ErrorCode.TYPE_MISMATCH));
@@ -263,7 +263,7 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-023",
                 "name", "Nick",
-                "departmentId", list("dept-eng"));
+                "department", list("dept-eng"));
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
         assertTrue(hasCode(errs, ErrorCode.TYPE_MISMATCH));
@@ -271,19 +271,19 @@ class RelationshipsCardinalityTest extends TestHelpers {
 
     @Test
     void has_one_horizontal_minlength_enforced() {
-        // departmentId has minLength: 1 — empty string is invalid
+        // department has minLength: 1 — empty string is invalid
         Map<String, Object> emp = map(
                 "_type", "Employee",
                 "employeeId", "emp-024",
                 "name", "Olivia",
-                "departmentId", "");
+                "department", "");
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
         assertTrue(hasCode(errs, ErrorCode.STRING_TOO_SHORT));
     }
 
     // ------------------------------------------------------------------
-    // §8.7 — Has-many horizontal (Employee.projectIds → string[] IDs)
+    // §8.7 — Has-many horizontal (Employee.projects → Project ID array via refType)
     // ------------------------------------------------------------------
 
     @Test
@@ -292,8 +292,8 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-030",
                 "name", "Paul",
-                "departmentId", "dept-eng",
-                "projectIds", list("proj-alpha", "proj-beta", "proj-gamma"));
+                "department", "dept-eng",
+                "projects", list("proj-alpha", "proj-beta", "proj-gamma"));
 
         assertEquals(List.of(), new Validator(r).validate(emp, schema.types.get("Employee"), schema));
     }
@@ -304,8 +304,8 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-031",
                 "name", "Quinn",
-                "departmentId", "dept-eng",
-                "projectIds", list());
+                "department", "dept-eng",
+                "projects", list());
 
         assertEquals(List.of(), new Validator(r).validate(emp, schema.types.get("Employee"), schema));
     }
@@ -316,8 +316,8 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-032",
                 "name", "Rose",
-                "departmentId", "dept-eng",
-                "projectIds", list("proj-ok", 99));
+                "department", "dept-eng",
+                "projects", list("proj-ok", 99));
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
         assertTrue(hasCode(errs, ErrorCode.TYPE_MISMATCH));
@@ -329,8 +329,8 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "_type", "Employee",
                 "employeeId", "emp-033",
                 "name", "Sam",
-                "departmentId", "dept-eng",
-                "projectIds", "proj-alpha");
+                "department", "dept-eng",
+                "projects", "proj-alpha");
 
         List<ValidationError> errs = new Validator(r).validate(emp, schema.types.get("Employee"), schema);
         assertTrue(hasCode(errs, ErrorCode.TYPE_MISMATCH));
@@ -346,8 +346,8 @@ class RelationshipsCardinalityTest extends TestHelpers {
                 "badges", list(
                         map("_type", "Badge", "badgeId", "b-1", "label", "Expert", "level", 4),
                         map("_type", "Badge", "badgeId", "b-2", "label", "Mentor")),
-                "departmentId", "dept-rd",
-                "projectIds", list("proj-x", "proj-y"));
+                "department", "dept-rd",
+                "projects", list("proj-x", "proj-y"));
 
         assertEquals(List.of(), new Validator(r).validate(emp, schema.types.get("Employee"), schema));
     }
