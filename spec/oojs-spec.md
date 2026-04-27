@@ -1606,7 +1606,7 @@ The target type annotation (`Person`) is intentionally dropped in the JSON Schem
 <a id="sec-14-1"></a>
 ### 14.1 Media Type
 
-This specification registers the following media type:
+This specification proposes the following media type for IANA registration. It has not yet been formally registered.
 
 - Type name: `application`
 - Subtype name: `oojs+json`
